@@ -14,8 +14,10 @@
 # Dependency directories (remove the comment below to include it)
 vendor/
 bin
-# Go workspace file
-go.work
+# Go workspace: go.work IS committed on purpose — the app/user_center nested
+# module resolves the root module (api/, pkg/) only through it. Ignore just the
+# derived checksum file.
+go.work.sum
 
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o

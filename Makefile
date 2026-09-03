@@ -30,9 +30,9 @@ wire:
 	cd app/user_center/cmd/user_center && wire
 
 .PHONY: build
-# build all commands into bin/
+# build all commands into bin/ (root module + the app/user_center nested module)
 build:
-	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./...
+	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
 
 .PHONY: run-user-center
 # run the user_center service locally (reads configs/user_center.yaml)
@@ -45,16 +45,19 @@ run-gateway:
 	go run ./app/gateway/cmd/gateway
 
 .PHONY: test
-# run all tests
+# run all tests (root module + the app/user_center nested module)
 test:
-	go test ./...
+	go test ./... ./app/user_center/...
 
 .PHONY: generate
-# regenerate ORM and DI code, then tidy modules
+# regenerate ORM and DI code.
+# NOTE: no bare `go mod tidy` here. app/user_center is a nested module with a
+# minimal go.mod that borrows every dependency from the root go.mod through
+# go.work; tidying the root would prune the deps only app/user_center uses.
+# Add a new dependency with `go get <mod>` at the repo root instead.
 generate:
 	cd app/user_center/internal/data/ent && go run generate.go
 	cd app/user_center/cmd/user_center && wire
-	go mod tidy
 
 .PHONY: all
 # generate all code
