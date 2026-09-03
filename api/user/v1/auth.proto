@@ -59,8 +59,11 @@ message RegisterRequest {
   string username = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
-      required: true,
-      string: {min_len: 3, max_len: 64}
+      required: true
+      string: {
+        min_len: 3
+        max_len: 64
+      }
     }
   ];
 
@@ -68,8 +71,11 @@ message RegisterRequest {
   string email = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
-      required: true,
-      string: {email: true, max_len: 255}
+      required: true
+      string: {
+        email: true
+        max_len: 255
+      }
     }
   ];
 
@@ -77,8 +83,11 @@ message RegisterRequest {
   string password = 3 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
-      required: true,
-      string: {min_len: 8, max_len: 72}
+      required: true
+      string: {
+        min_len: 8
+        max_len: 72
+      }
     }
   ];
 
@@ -178,8 +187,11 @@ message ChangePasswordRequest {
   string new_password = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
-      required: true,
-      string: {min_len: 8, max_len: 72}
+      required: true
+      string: {
+        min_len: 8
+        max_len: 72
+      }
     }
   ];
 }

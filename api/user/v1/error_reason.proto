@@ -12,23 +12,23 @@ enum ErrorReason {
   ERROR_REASON_UNSPECIFIED = 0;
 
   // The requested user was not found.
-  USER_NOT_FOUND = 1;
+  ERROR_REASON_USER_NOT_FOUND = 1;
 
   // A user with the same username or email already exists.
-  USER_ALREADY_EXISTS = 2;
+  ERROR_REASON_USER_ALREADY_EXISTS = 2;
 
   // The request contains invalid arguments.
-  USER_INVALID_ARGUMENT = 3;
+  ERROR_REASON_USER_INVALID_ARGUMENT = 3;
 
   // The supplied credentials are invalid.
-  AUTH_INVALID_CREDENTIALS = 4;
+  ERROR_REASON_AUTH_INVALID_CREDENTIALS = 4;
 
   // The access or refresh token has expired.
-  AUTH_TOKEN_EXPIRED = 5;
+  ERROR_REASON_AUTH_TOKEN_EXPIRED = 5;
 
   // The token is malformed or tampered with.
-  AUTH_TOKEN_INVALID = 6;
+  ERROR_REASON_AUTH_TOKEN_INVALID = 6;
 
   // The request is not authenticated.
-  AUTH_UNAUTHORIZED = 7;
+  ERROR_REASON_AUTH_UNAUTHORIZED = 7;
 }
