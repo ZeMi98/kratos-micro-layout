@@ -20,7 +20,7 @@
                         └──────┬──────┘
                                │
                  ┌─────────────┴─────────────┐
-                 │  biz ─► data (ent|gorm)   │  sqlite(默认)/mysql
+                 │  biz ─► data (ent|gorm)   │  sqlite(默认)/mysql/postgres
                  └───────────────────────────┘
 ```
 
@@ -28,8 +28,11 @@
 
 | 层 | 仓库 | 用途 |
 |---|---|---|
-| 项目模板 | 本仓库整体 | `kratos new PROJECT -b <repo>.git` 创建新项目 |
-| 服务模板 | `app/user_center/` | `kratos new app/SERVICE --nomod -b <repo>.git` 在项目内创建新微服务 |
+| 项目模板 | 本仓库整体 | `kratos new PROJECT -r https://github.com/ZeMi98/kratos-micro-layout.git` 创建新项目 |
+| 服务模板 | `app/user_center/` | `kratos new app/SERVICE --nomod -r https://github.com/ZeMi98/kratos-micro-sub-service-layout.git` 在项目内创建新微服务 |
+
+> **两个模板仓库**：项目模板 [github.com/ZeMi98/kratos-micro-layout](https://github.com/ZeMi98/kratos-micro-layout)（本仓库整体）· 服务模板 [github.com/ZeMi98/kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)（即 `app/user_center/`）。
+> `kratos new` 用 `-r/--repo` 指定模板仓库、`--nomod` 复用项目根模块；别误用 `-b/--branch`（那是指定分支，写成 `-b <url>` 会报 `Remote branch ... not found`）。
 
 ## 目录结构
 
@@ -59,6 +62,25 @@ Makefile / buf*.yaml         代码生成入口
 Dockerfile                   参数化构建任意服务的镜像
 ```
 
+## 多模块与 go.work 工作区
+
+本仓库是一个 **Go workspace（多模块）**：根模块承载 `api/`、`pkg/` 与 `app/gateway/`，而 `app/user_center/` 是一个**嵌套的独立模块**（自带 `go.mod`，同时作为服务模板托管在 [kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)）。根目录的 `go.work`（**已提交**）把两者纳入同一工作区：
+
+```
+go 1.26.0
+
+use (
+	.                 # 根模块：api/、pkg/、app/gateway/
+	./app/user_center # 嵌套的服务模块
+)
+```
+
+- **为什么 user_center 必须有 `go.mod`**：`kratos new --nomod -r <repo>` 生成新服务时，CLI 会读取模板 `go.mod` 的 module path 作为替换基准；缺了它直接报错。所以 `app/user_center/go.mod` 不能删。
+- **为什么它是最小的**：`app/user_center/go.mod` 只有 `module` + `go` 两行，不列任何 `require`。它对第三方依赖（kratos、ent/gorm、pgx…）以及对根模块 `api/`、`pkg/` 的引用，全部经 `go.work` 从**根模块的构建列表**解析 —— 服务模板因此不必重复维护一份依赖清单。
+- **对命令行的影响**：嵌套模块会被父模块的裸 `./...` 排除，故 `Makefile` 的 `build`/`test` 显式带上 `./app/user_center/...`；工作区内 `cd app/user_center && go build ./...` 与根目录 `go build ./app/user_center/...` 均可正常解析。
+- **加依赖只在根目录做**：根模块自身并不 import ent/gorm/pgx（只有 user_center 用），因此**不要在根目录裸跑 `go mod tidy`** —— 它会把“仅 user_center 使用”的依赖当作无用而剪掉，破坏工作区解析。新增依赖统一用 `go get <module>` 加到根 `go.mod`（`make generate` 已刻意不含 tidy）。
+- `go.work.sum` 是工作区派生的校验文件，已在 `.gitignore` 忽略；`go.work` 本身必须提交，否则新克隆无法解析 user_center。
+
 ## 快速开始
 
 ### 1. 用模板创建新项目
@@ -68,7 +90,7 @@ Dockerfile                   参数化构建任意服务的镜像
 go install github.com/go-kratos/kratos/cmd/kratos/v3@latest
 
 # 基于本模板创建项目（替换 REPO 为你的 fork 地址）
-kratos new my-project -b https://github.com/ZeMi98/kratos-micro-layout.git
+kratos new my-project -r https://github.com/ZeMi98/kratos-micro-layout.git
 cd my-project
 ```
 
@@ -77,11 +99,11 @@ cd my-project
 `app/user_center` 就是服务模板。把它推到独立仓库后，可在任意项目内孵化新服务：
 
 ```bash
-# 将 user_center 抽为独立服务模板仓库（一次性）
-cd app/user_center && git init && git remote add origin <你的服务模板仓库> && git push -u origin main
+# 服务模板托管在独立仓库 kratos-micro-sub-service-layout，直接用它孵化新服务：
+# （--nomod：不在新服务里生成独立 go.mod，复用项目根模块）
+kratos new app/order --nomod -r https://github.com/ZeMi98/kratos-micro-sub-service-layout.git
 
-# 之后在项目内创建新服务（--nomod：不生成 go.mod，复用项目模块）
-kratos new app/order --nomod -b <你的服务模板仓库>.git
+# 想用自己的模板？fork kratos-micro-sub-service-layout，把上面的 -r 换成你的 fork 地址
 ```
 
 新建的 `app/order` 与 `user_center` 同构：同样的 internal 分层、同样的配置加载逻辑。
@@ -160,7 +182,7 @@ make config        # 各服务 internal/conf → *.pb.go
 | 键 | 说明 |
 |---|---|
 | `data.database.orm` | `ent` 或 `gorm`，须与保留的 `internal/data` 子包一致 |
-| `data.database.driver` | `sqlite`（纯 Go、免 CGO）或 `mysql` |
+| `data.database.driver` | `sqlite`（纯 Go、免 CGO，默认）、`mysql` 或 `postgres`（详见「数据库接入」） |
 | `auth.jwt_secret` / `*_ttl` | JWT 密钥（用 `${AUTH_JWT_SECRET:...}` 注入）与 access/refresh token 有效期 |
 | `log.level` / `output` / `format` | 日志级别、输出目标（stdout/stderr/file）与编码（text/json）；引擎固定为标准库 log/slog |
 | `registry.address` | Nacos 服务器地址；留空则禁用注册/发现/远程配置（本地零依赖默认） |
@@ -172,6 +194,40 @@ make config        # 各服务 internal/conf → *.pb.go
 ## HTTP API 约定
 
 user_center 的 HTTP/gRPC server 在 `internal/server/` 装配横切能力，中间件本体统一放在 `pkg/middleware/`（新服务直接复用，无需重写）。中间件链（外→内）：`recovery → tracing → logging → ratelimit → auth → validate`。限流置于 logging 之后（被限流的 429 仍留痕）、auth 之前（流量洪峰时不浪费 JWT 验签 CPU）；默认关闭，开启方式见「限流与熔断」。
+
+### 中间件套件与接入
+
+横切能力全部沉淀在 `pkg/middleware/`，新服务直接复用；`internal/server/` 只按配置把它们**装配成链**：
+
+| 文件 | 主要导出 | 职责 |
+|---|---|---|
+| `codec.go` | `RequestDecoder` / `ResponseEncoder` / `ErrorEncoder` / `Envelope` | protojson 编解码 + 统一响应信封（仅 HTTP 挂载） |
+| `logging.go` | `RequestLogger(logger)` | 每请求一行结构化日志，**不打印请求体** |
+| `ratelimit.go` | `RateLimitServer(enabled, kind, qps, burst)` / `RateLimitFilter(...)` / `NewTokenLimiter(...)` | 服务端限流中间件（未启用返回 `nil`）/ 网关 HTTP filter |
+| `auth.go` | `TokenVerifier` 接口 + `TokenAuth(verifier, unauthorizedErr)`；`UserIDFromContext` / `ClaimsFromContext` | 抽取 bearer、校验、把 `AuthClaims` 注入 `context` |
+| `validate.go` | `ProtoValidator` | 供 kratos `validate.Validator(...)` 使用的 protovalidate 校验器 |
+
+链在 `internal/server/http.go`（gRPC 同构，见 `grpc.go`）按**外→内**组装。限流是可选的 —— `RateLimitServer` 未启用时返回 `nil`，所以先建基础切片、非 `nil` 才追加，其余顺序不受影响：
+
+```go
+mws := []middleware.Middleware{
+	recovery.Recovery(),          // 最外层：兜住下游 panic
+	tracing.Server(),             // 开 span，日志/handler 继承 trace_id
+	pkgmw.RequestLogger(logger),
+}
+rl := mw.GetRatelimit()
+if limiter := pkgmw.RateLimitServer(rl.GetEnabled(), rl.GetType(), int(rl.GetQps()), int(rl.GetBurst())); limiter != nil {
+	mws = append(mws, limiter)    // 默认关闭时不进链
+}
+mws = append(mws,
+	authMiddleware(authUC),                   // 选择性鉴权（selector 白名单）
+	validate.Validator(pkgmw.ProtoValidator), // 最内层：贴近 handler 校验入参
+)
+```
+
+HTTP 额外用 `http.RequestDecoder/ResponseEncoder/ErrorEncoder` 挂 protojson 与信封；gRPC 保留原生 status code、不套信封，其余中间件与 HTTP 完全一致。
+
+**接入一个新中间件**：把可复用逻辑写进 `pkg/middleware/<name>.go`（导出一个返回 `middleware.Middleware` 的构造器），再在 `http.go` 和 `grpc.go` 的 `mws` 切片里按期望顺序 `append` —— 两个 transport 要同步改以免行为漂移。服务专属、不适合下沉的部分（把 `biz.AuthUsecase` 适配成 `TokenVerifier`、`selector` 白名单）留在 `internal/server/auth.go`。
 
 ### 统一响应信封
 
@@ -227,7 +283,35 @@ string password = 3 [(buf.validate.field) = {
 - `pkg/middleware/logging.go`（`RequestLogger`）：每请求记一行 `kind/operation/code/reason/latency`，**不打印请求体**（避免明文密码入日志）；出错时升为 Error 级并带 message。未使用 kratos 自带 `logging.Server()`，因其 `%+v` 会 dump 出密码。
 - `tracing.Server()`（contrib/otel）已挂载，日志自动携带 `trace_id`/`span_id`。**默认无 exporter（noop）**，接入时在 `main.go` 设置全局 `otel.SetTracerProvider(...)`（OTLP/Jaeger 等）即可生效，无需改动中间件。
 
-## 切换 ORM（ent ↔ gorm）
+## 数据库接入（ent / gorm × sqlite / mysql / postgres）
+
+存储层由两个正交维度决定：**ORM 引擎**（`data.database.orm`：`ent` 或 `gorm`）与 **SQL 驱动**（`data.database.driver`：`sqlite` / `mysql` / `postgres`）。两套 ORM 都支持这三种驱动，可自由组合。
+
+### 驱动与 DSN
+
+| `driver` | 底层依赖（ent / gorm） | `source`（DSN）示例 | 备注 |
+|---|---|---|---|
+| `sqlite` | `modernc.org/sqlite` / `glebarez/sqlite`（均纯 Go、免 CGO） | `user_center.db`（文件路径） | 默认，本地零依赖；ent 侧自动补 `foreign_keys` pragma |
+| `mysql` | `go-sql-driver/mysql` / `gorm.io/driver/mysql` | `user:pass@tcp(127.0.0.1:3306)/dbname?parseTime=true` | 生产常用 |
+| `postgres` | `jackc/pgx/v5/stdlib` / `gorm.io/driver/postgres` | `postgres://user:pass@127.0.0.1:5432/dbname?sslmode=disable` | 亦接受别名 `postgresql` |
+
+> ent 把 `database/sql` 驱动名与 dialect 常量分开映射：pgx 注册名是 `pgx`、ent dialect 是 `postgres`；纯 Go sqlite 注册名是 `sqlite`、ent dialect 是 `sqlite3`。配置里统一填 `driver: postgres`（或 `mysql` / `sqlite`）即可，映射在 `internal/data/ent/data.go` 内部完成。
+
+以 postgres + gorm 为例，改 `configs/user_center.yaml`：
+
+```yaml
+data:
+  database:
+    driver: postgres
+    source: postgres://user:pass@127.0.0.1:5432/user_center?sslmode=disable
+    orm: gorm
+    debug: false          # true 时打印每条 SQL（仅开发）
+    auto_migrate: true    # 启动建表/改表；生产建议关闭，改用受控迁移
+```
+
+`debug` / `auto_migrate` 对两种 ORM 都生效：`auto_migrate` 是本地开发的便利（ent 走 `Schema.Create`、gorm 走 `AutoMigrate`），**生产应关闭**，把表结构变更作为独立、可评审的步骤。凭据不要写进版本库 —— 用 `${VAR:default}` 占位符或 Nacos 配置中心注入（见「配置说明」）。
+
+### 切换 ORM（ent ↔ gorm）
 
 两套实现是自包含子包，各带完整 `ProviderSet`。切换 = 删一个目录 + 改一行：
 
