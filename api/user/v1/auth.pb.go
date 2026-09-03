@@ -108,8 +108,8 @@ func (x *RegisterRequest) GetPhone() string {
 // RegisterReply is the response for Register.
 type RegisterReply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ID of the newly created user.
-	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// ID of the newly created user (snowflake int64; JSON string via protojson).
+	UserId int64 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	// Login username.
 	Username string `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
 	// Email address.
@@ -148,11 +148,11 @@ func (*RegisterReply) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RegisterReply) GetUserId() string {
+func (x *RegisterReply) GetUserId() int64 {
 	if x != nil {
 		return x.UserId
 	}
-	return ""
+	return 0
 }
 
 func (x *RegisterReply) GetUsername() string {
@@ -301,8 +301,8 @@ func (x *TokenPair) GetTokenType() string {
 type LoginReply struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Tokens *TokenPair             `protobuf:"bytes,1,opt,name=tokens,proto3" json:"tokens,omitempty"`
-	// User ID.
-	UserId string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// User ID (snowflake int64; JSON string via protojson).
+	UserId int64 `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	// Login username.
 	Username      string `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -346,11 +346,11 @@ func (x *LoginReply) GetTokens() *TokenPair {
 	return nil
 }
 
-func (x *LoginReply) GetUserId() string {
+func (x *LoginReply) GetUserId() int64 {
 	if x != nil {
 		return x.UserId
 	}
-	return ""
+	return 0
 }
 
 func (x *LoginReply) GetUsername() string {
@@ -640,7 +640,7 @@ const file_user_v1_auth_proto_rawDesc = "" +
 	"\bnickname\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18@R\bnickname\x12\x1d\n" +
 	"\x05phone\x18\x05 \x01(\tB\a\xbaH\x04r\x02\x18 R\x05phone\"Z\n" +
 	"\rRegisterReply\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\"\\\n" +
 	"\fLoginRequest\x12%\n" +
@@ -656,7 +656,7 @@ const file_user_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"LoginReply\x12.\n" +
 	"\x06tokens\x18\x01 \x01(\v2\x16.api.user.v1.TokenPairR\x06tokens\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\"2\n" +
 	"\rLogoutRequest\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"\r\n" +

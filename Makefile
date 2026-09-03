@@ -22,7 +22,7 @@ config:
 .PHONY: ent
 # regenerate ent ORM code after editing internal/data/ent/schema
 ent:
-	go run ./app/user_center/internal/data/ent/generate.go
+	cd app/user_center/internal/data/ent && go run generate.go
 
 .PHONY: wire
 # regenerate dependency-injection code
@@ -52,7 +52,7 @@ test:
 .PHONY: generate
 # regenerate ORM and DI code, then tidy modules
 generate:
-	go run ./app/user_center/internal/data/ent/generate.go
+	cd app/user_center/internal/data/ent && go run generate.go
 	cd app/user_center/cmd/user_center && wire
 	go mod tidy
 

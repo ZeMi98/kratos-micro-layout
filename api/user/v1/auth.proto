@@ -91,8 +91,8 @@ message RegisterRequest {
 
 // RegisterReply is the response for Register.
 message RegisterReply {
-  // ID of the newly created user.
-  string user_id = 1;
+  // ID of the newly created user (snowflake int64; JSON string via protojson).
+  int64 user_id = 1;
 
   // Login username.
   string username = 2;
@@ -135,8 +135,8 @@ message TokenPair {
 message LoginReply {
   TokenPair tokens = 1;
 
-  // User ID.
-  string user_id = 2;
+  // User ID (snowflake int64; JSON string via protojson).
+  int64 user_id = 2;
 
   // Login username.
   string username = 3;

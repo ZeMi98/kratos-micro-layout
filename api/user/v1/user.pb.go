@@ -81,8 +81,9 @@ func (UserStatus) EnumDescriptor() ([]byte, []int) {
 // User is the user account resource.
 type User struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Unique identifier (UUIDv7).
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Unique identifier (snowflake int64). Serialised as a JSON string by
+	// protojson so the 64-bit value stays precise in JavaScript clients.
+	Id int64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Login username. Unique across the system.
 	// The shared resource is reused by UpdateUser (PATCH), so rules ignore the
 	// zero value: a patch that omits username skips these checks, while a create
@@ -137,11 +138,11 @@ func (*User) Descriptor() ([]byte, []int) {
 	return file_user_v1_user_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *User) GetId() string {
+func (x *User) GetId() int64 {
 	if x != nil {
 		return x.Id
 	}
-	return ""
+	return 0
 }
 
 func (x *User) GetUsername() string {
@@ -258,8 +259,8 @@ func (x *CreateUserRequest) GetPassword() string {
 // GetUserRequest is the request message for GetUser.
 type GetUserRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// User ID (UUID string).
-	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// User ID (snowflake int64).
+	Id            int64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -294,11 +295,11 @@ func (*GetUserRequest) Descriptor() ([]byte, []int) {
 	return file_user_v1_user_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetUserRequest) GetId() string {
+func (x *GetUserRequest) GetId() int64 {
 	if x != nil {
 		return x.Id
 	}
-	return ""
+	return 0
 }
 
 // ListUsersRequest is the request message for ListUsers.
@@ -494,8 +495,8 @@ func (x *UpdateUserRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 // DeleteUserRequest is the request message for DeleteUser.
 type DeleteUserRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// User ID (UUID string).
-	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// User ID (snowflake int64).
+	Id            int64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -530,11 +531,11 @@ func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
 	return file_user_v1_user_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *DeleteUserRequest) GetId() string {
+func (x *DeleteUserRequest) GetId() int64 {
 	if x != nil {
 		return x.Id
 	}
-	return ""
+	return 0
 }
 
 // DeleteUserReply is the response message for DeleteUser.
@@ -578,9 +579,10 @@ var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/user.proto\x12\vapi.user.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x85\x03\n" +
-	"\x04User\x12\x1b\n" +
-	"\x02id\x18\x01 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x02id\x12+\n" +
+	"\x12user/v1/user.proto\x12\vapi.user.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x84\x03\n" +
+	"\x04User\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\x03B\n" +
+	"\xbaH\a\xd8\x01\x01\"\x02 \x00R\x02id\x12+\n" +
 	"\busername\x18\x02 \x01(\tB\x0f\xe0A\x02\xbaH\t\xd8\x01\x01r\x04\x10\x03\x18@R\busername\x12&\n" +
 	"\x05email\x18\x03 \x01(\tB\x10\xe0A\x02\xbaH\n" +
 	"\xd8\x01\x01r\x05\x18\xff\x01`\x01R\x05email\x12\x1d\n" +
@@ -594,9 +596,9 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"r\n" +
 	"\x11CreateUserRequest\x120\n" +
 	"\x04user\x18\x01 \x01(\v2\x11.api.user.v1.UserB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x04user\x12+\n" +
-	"\bpassword\x18\x02 \x01(\tB\x0f\xe0A\x02\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\bpassword\"0\n" +
-	"\x0eGetUserRequest\x12\x1e\n" +
-	"\x02id\x18\x01 \x01(\tB\x0e\xe0A\x02\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\x02id\"\x81\x01\n" +
+	"\bpassword\x18\x02 \x01(\tB\x0f\xe0A\x02\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\bpassword\"/\n" +
+	"\x0eGetUserRequest\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\x03B\r\xe0A\x02\xbaH\a\xc8\x01\x01\"\x02 \x00R\x02id\"\x81\x01\n" +
 	"\x10ListUsersRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -611,9 +613,9 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"\x11UpdateUserRequest\x120\n" +
 	"\x04user\x18\x01 \x01(\v2\x11.api.user.v1.UserB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x04user\x12C\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"updateMask\"3\n" +
-	"\x11DeleteUserRequest\x12\x1e\n" +
-	"\x02id\x18\x01 \x01(\tB\x0e\xe0A\x02\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\x02id\"\x11\n" +
+	"updateMask\"2\n" +
+	"\x11DeleteUserRequest\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\x03B\r\xe0A\x02\xbaH\a\xc8\x01\x01\"\x02 \x00R\x02id\"\x11\n" +
 	"\x0fDeleteUserReply*t\n" +
 	"\n" +
 	"UserStatus\x12\x1b\n" +

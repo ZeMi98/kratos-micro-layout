@@ -40,6 +40,12 @@ auth:
   access_token_ttl: 7200s    # 2h
   refresh_token_ttl: 604800s # 7d
 
+# Distributed ID generation. The biz layer mints int64 snowflake primary keys,
+# so every instance in a cluster must carry a distinct node_id in [0, 1023].
+# 0 is fine for a single instance; assign unique values before scaling out.
+snowflake:
+  node_id: 0              # cluster-unique in [0, 1023]; override per instance
+
 log:
   level: info
   output: stdout

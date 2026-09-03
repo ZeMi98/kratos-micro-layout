@@ -59,10 +59,11 @@ enum UserStatus {
 
 // User is the user account resource.
 message User {
-  // Unique identifier (UUIDv7).
-  string id = 1 [(buf.validate.field) = {
+  // Unique identifier (snowflake int64). Serialised as a JSON string by
+  // protojson so the 64-bit value stays precise in JavaScript clients.
+  int64 id = 1 [(buf.validate.field) = {
     ignore: IGNORE_IF_ZERO_VALUE
-    string: {uuid: true}
+    int64: {gt: 0}
   }];
 
   // Login username. Unique across the system.
@@ -135,12 +136,12 @@ message CreateUserRequest {
 
 // GetUserRequest is the request message for GetUser.
 message GetUserRequest {
-  // User ID (UUID string).
-  string id = 1 [
+  // User ID (snowflake int64).
+  int64 id = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      string: {uuid: true}
+      int64: {gt: 0}
     }
   ];
 }
@@ -184,12 +185,12 @@ message UpdateUserRequest {
 
 // DeleteUserRequest is the request message for DeleteUser.
 message DeleteUserRequest {
-  // User ID (UUID string).
-  string id = 1 [
+  // User ID (snowflake int64).
+  int64 id = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      string: {uuid: true}
+      int64: {gt: 0}
     }
   ];
 }

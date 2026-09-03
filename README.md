@@ -287,8 +287,10 @@ id, err := node.Generate()
 if err != nil { return err }                // 时钟大幅回拨时返回 ErrClockBackwards
 
 user.ID  = id.Int64()                       // 存入 BIGINT
-reply.Id = id.String()                      // 传给 JS 客户端时用字符串，避免 2^53 精度丢失
+reply.Id = id.Int64()                       // DTO 字段声明为 int64，protojson 自动输出 JSON 字符串，JS 端不丢 2^53 精度
 ```
+
+> **user_center 已就地接入**：`internal/biz` 定义 `IDGenerator` 接口，`NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent / gorm 主键均为**不自增**的 BIGINT。
 
 ### 节点号分配策略
 

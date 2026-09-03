@@ -173,7 +173,7 @@ paths:
             parameters:
                 - name: id
                   in: path
-                  description: User ID (UUID string).
+                  description: User ID (snowflake int64).
                   required: true
                   schema:
                     type: string
@@ -192,7 +192,7 @@ paths:
             parameters:
                 - name: id
                   in: path
-                  description: User ID (UUID string).
+                  description: User ID (snowflake int64).
                   required: true
                   schema:
                     type: string
@@ -278,7 +278,7 @@ components:
                     $ref: '#/components/schemas/api.user.v1.TokenPair'
                 userId:
                     type: string
-                    description: User ID.
+                    description: User ID (snowflake int64; JSON string via protojson).
                 username:
                     type: string
                     description: Login username.
@@ -329,7 +329,7 @@ components:
             properties:
                 userId:
                     type: string
-                    description: ID of the newly created user.
+                    description: ID of the newly created user (snowflake int64; JSON string via protojson).
                 username:
                     type: string
                     description: Login username.
@@ -384,7 +384,9 @@ components:
             properties:
                 id:
                     type: string
-                    description: Unique identifier (UUIDv7).
+                    description: |-
+                        Unique identifier (snowflake int64). Serialised as a JSON string by
+                         protojson so the 64-bit value stays precise in JavaScript clients.
                 username:
                     type: string
                     description: |-
