@@ -1,6 +1,6 @@
 # kratos-micro-layout
 
-基于 [Kratos v3](https://go-kratos.dev) 的微服务 monorepo 模板：一个 HTTP 网关 + 一个用户中心服务模板 + 共享基础库（日志、Nacos、限流、雪花 ID）。
+基于 [Kratos v3](https://go-kratos.dev) 的微服务 monorepo 模板：一个 HTTP 网关 + 一个用户中心服务模板 + 共享基础库（日志、Nacos、传输中间件套件、JWT 令牌引擎、ID 生成、雪花算法）。
 
 数据库保留 ent / gorm 两套实现，按需删减；日志统一用标准库 **log/slog**（Text/JSON + lumberjack 轮转）；服务注册 / 发现 / 配置中心统一由 **Nacos** 承担（kratos 生态中最主流、也是唯一同时提供注册与热更新配置的后端），网关内建**限流 + 熔断**，分布式 ID 由 `pkg/snowflake` 就地生成，全部配置集中在根目录 `configs/`。
 
@@ -38,9 +38,9 @@ api/user/v1/                 服务对外的 proto 契约（DTO）与生成代�
 app/user_center/             服务模板：用户中心（登录注册/鉴权/改密）
   cmd/user_center/           入口 + Wire 注入
   internal/conf/             配置 proto（make config 生成）
-  internal/server/           HTTP/gRPC server 装配
+  internal/server/           HTTP/gRPC server 装配 + 鉴权 selector（中间件本体在 pkg/middleware）
   internal/service/          DTO ↔ DO 转换层
-  internal/biz/              领域模型、用例、Repo 接口、JWT
+  internal/biz/              领域模型、用例、Repo 接口、错误；JWT/ID 引擎的薄 conf provider
   internal/data/             薄入口：ProviderSet 指向所保留的 ORM
     ent/                     Ent 实现（schema + 生成代码 + repo）
     gorm/                    GORM 实现（model + repo）
@@ -48,7 +48,9 @@ app/gateway/                 网关（无 biz/data，手工装配）
   internal/proxy/            服务发现 + selector 负载均衡 + 反向代理 + 每后端熔断
   internal/server/           监听器、CORS、边缘限流 filter、路由注册
 pkg/log/                     日志构建：标准库 log/slog（Text/JSON）+ lumberjack 文件轮转
-pkg/middleware/              可复用请求中间件：限流（服务端 BBR/token + 网关 filter）
+pkg/middleware/              可复用传输中间件：鉴权、编解码(信封+protojson)、日志、校验、限流
+pkg/jwt/                     HS256 令牌引擎（Manager/Claims）：签发与校验 access/refresh token
+pkg/idgen/                   ID 抽象：Generator 接口 + 雪花实现（int64 主键）
 pkg/nacos/                   Nacos 注册/发现、配置中心 Source 封装
 pkg/snowflake/               Twitter Snowflake 分布式 ID 生成器（64-bit，无协调、可排序）
 configs/user_center.yaml     每服务一份配置，集中存放
@@ -169,7 +171,7 @@ make config        # 各服务 internal/conf → *.pb.go
 
 ## HTTP API 约定
 
-user_center 的 HTTP/gRPC server 在 `internal/server/` 统一装配了一组横切能力。中间件链（外→内）：`recovery → tracing → logging → ratelimit → auth → validate`。限流置于 logging 之后（被限流的 429 仍留痕）、auth 之前（流量洪峰时不浪费 JWT 验签 CPU）；默认关闭，开启方式见「限流与熔断」。
+user_center 的 HTTP/gRPC server 在 `internal/server/` 装配横切能力，中间件本体统一放在 `pkg/middleware/`（新服务直接复用，无需重写）。中间件链（外→内）：`recovery → tracing → logging → ratelimit → auth → validate`。限流置于 logging 之后（被限流的 429 仍留痕）、auth 之前（流量洪峰时不浪费 JWT 验签 CPU）；默认关闭，开启方式见「限流与熔断」。
 
 ### 统一响应信封
 
@@ -186,7 +188,7 @@ user_center 的 HTTP/gRPC server 在 `internal/server/` 统一装配了一组横
 | `message` | 空 | 错误描述 |
 | `data` | 资源对象 | `null` |
 
-实现在 `internal/server/codec.go`（`responseEncoder`/`errorEncoder`）。想恢复语义化 HTTP 状态码，改 `writeEnvelope` 里的 `WriteHeader` 一行即可。**gRPC 不套信封**，沿用原生 status code。
+实现在 `pkg/middleware/codec.go`（`ResponseEncoder`/`ErrorEncoder`）。想恢复语义化 HTTP 状态码，改 `writeEnvelope` 里的 `WriteHeader` 一行即可。**gRPC 不套信封**，沿用原生 status code。
 
 ### protojson 序列化
 
@@ -197,7 +199,7 @@ user_center 的 HTTP/gRPC server 在 `internal/server/` 统一装配了一组横
 - 字段名 snake_case（`UseProtoNames`），与 `.proto`、`openapi.yaml` 对齐
 - int64 编码为字符串，避免 JS 精度丢失
 
-请求侧同样走 protojson（`requestDecoder`），因此客户端可把响应里的字段原样回传（枚举名、RFC 3339 时间都能被解析）。
+请求侧同样走 protojson（`pkg/middleware` 的 `RequestDecoder`），因此客户端可把响应里的字段原样回传（枚举名、RFC 3339 时间都能被解析）。
 
 ### 参数校验（protovalidate）
 
@@ -218,11 +220,11 @@ string password = 3 [(buf.validate.field) = {
 
 ### 鉴权（JWT）
 
-`internal/server/auth.go` 用 `selector` 中间件做**选择性**鉴权：`UserService` 全部 + `AuthService` 的 `Logout`/`ChangePassword` 需要 `Authorization: Bearer <access_token>`；`Register`/`Login`/`RefreshToken` 放行。校验通过后 claims 注入 `context`，下游用 `biz.UserIDFromContext(ctx)` 取当前用户。未带 / 无效 token 返回 `code=401, reason=AUTH_UNAUTHORIZED`。新增受保护 RPC 时，在 `authMiddleware` 的 `selector` 里加 `Prefix`/`Path` 即可。
+鉴权中间件本体在 `pkg/middleware/auth.go`（`TokenVerifier` 接口 + `TokenAuth`：抽取 bearer、校验、把 `AuthClaims` 注入 `context`），令牌引擎在 `pkg/jwt`（HS256 签发/校验）。`internal/server/auth.go` 只保留**服务专属**部分：一个把 `biz.AuthUsecase` 适配成 `TokenVerifier` 的小结构，加一个 `selector` 做**选择性**鉴权 —— `UserService` 全部 + `AuthService` 的 `Logout`/`ChangePassword` 需要 `Authorization: Bearer <access_token>`；`Register`/`Login`/`RefreshToken` 放行。校验通过后下游用 `pkgmw.UserIDFromContext(ctx)` 取当前用户。未带 / 无效 token 返回 `code=401, reason=AUTH_UNAUTHORIZED`。新增受保护 RPC 时，在 `authMiddleware` 的 `selector` 里加 `Prefix`/`Path` 即可。
 
 ### 请求日志与链路追踪
 
-- `internal/server/logging.go`：每请求记一行 `kind/operation/code/reason/latency`，**不打印请求体**（避免明文密码入日志）；出错时升为 Error 级并带 message。未使用 kratos 自带 `logging.Server()`，因其 `%+v` 会 dump 出密码。
+- `pkg/middleware/logging.go`（`RequestLogger`）：每请求记一行 `kind/operation/code/reason/latency`，**不打印请求体**（避免明文密码入日志）；出错时升为 Error 级并带 message。未使用 kratos 自带 `logging.Server()`，因其 `%+v` 会 dump 出密码。
 - `tracing.Server()`（contrib/otel）已挂载，日志自动携带 `trace_id`/`span_id`。**默认无 exporter（noop）**，接入时在 `main.go` 设置全局 `otel.SetTracerProvider(...)`（OTLP/Jaeger 等）即可生效，无需改动中间件。
 
 ## 切换 ORM（ent ↔ gorm）
@@ -290,7 +292,7 @@ user.ID  = id.Int64()                       // 存入 BIGINT
 reply.Id = id.Int64()                       // DTO 字段声明为 int64，protojson 自动输出 JSON 字符串，JS 端不丢 2^53 精度
 ```
 
-> **user_center 已就地接入**：`internal/biz` 定义 `IDGenerator` 接口，`NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent / gorm 主键均为**不自增**的 BIGINT。
+> **user_center 已就地接入**：`pkg/idgen` 定义 `Generator` 接口 + 雪花实现，`internal/biz` 的 `NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent / gorm 主键均为**不自增**的 BIGINT。
 
 ### 节点号分配策略
 

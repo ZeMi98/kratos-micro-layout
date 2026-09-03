@@ -20,7 +20,9 @@ app/gateway/cmd/gateway/     Gateway entrypoint (no Wire: manual assembly).
 app/gateway/internal/proxy/  Reverse proxy: discovery + selector LB + per-upstream breaker.
 app/gateway/internal/server/ Gateway HTTP server, CORS, edge rate-limit filter, routes.
 pkg/log/                     Logger builder: stdlib log/slog (Text/JSON) + lumberjack rotation.
-pkg/middleware/              Reusable request middleware (rate limiting).
+pkg/middleware/              Reusable transport middleware: auth, codec (envelope+protojson), logging, validate, rate limiting.
+pkg/jwt/                     HS256 token engine (Manager/Claims): sign & verify access/refresh tokens.
+pkg/idgen/                   ID seam: Generator interface + snowflake-backed impl (int64 keys).
 pkg/nacos/                   Nacos registrar/discovery and config-source wrappers.
 pkg/snowflake/               Twitter Snowflake distributed ID generator (64-bit).
 configs/<service>.yaml       Runtime config, one file per service. No secrets.
@@ -49,7 +51,8 @@ owns the PO; `service` is a pass-through that converts at its boundary.
 | data    | PO   | DO ↔ PO           | DTO                     |
 
 - `service` imports `api/...` (DTO) and `biz` (DO). Never `data`.
-- `biz` imports `api/...` only for error reason enums. Never `service`,
+- `biz` imports `api/...` only for error reason enums, plus shared
+  engines from `pkg/...` (`pkg/jwt`, `pkg/idgen`). Never `service`,
   never `data`. The repo interface declared here is the inversion seam.
 - `data` imports `biz` to implement the repo interface. Never `service`,
   never DTOs.
@@ -89,6 +92,11 @@ design rather than add the import.
 - Owns `ListOption` helpers — `ListFilter`, `ListOrderBy`, `ListOffset`,
   `ListLimit` — so callers compose queries without leaking storage
   primitives.
+- Depends on shared engines from `pkg` — `pkg/jwt.Manager` for tokens,
+  `pkg/idgen.Generator` for int64 keys — through thin `...FromConf`
+  wire providers (`biz/jwt.go`, `biz/id.go`). The domain rules that use
+  them (login, password hashing, ID assignment) stay here; the engines
+  do not, so a new service reuses them instead of re-declaring them.
 
 **data (DO ↔ PO)**
 
@@ -121,19 +129,26 @@ design rather than add the import.
   auth (a flood does not burn JWT-verify CPU); `pkgmw.RateLimitServer`
   returns nil when disabled, so the chain is built as a slice and the
   limiter is appended only when non-nil — the rest stays untouched when off.
-- _One concern per file_, beside `http.go`/`grpc.go`: `codec.go`
-  (envelope `responseEncoder`/`errorEncoder` + protojson
-  `requestDecoder`), `validate.go` (`protoValidator` runs the proto
+- _Shared middleware lives in `pkg/middleware`_, so a new service
+  imports it instead of re-declaring it: `codec.go` (envelope
+  `ResponseEncoder`/`ErrorEncoder` + protojson `RequestDecoder`),
+  `logging.go` (`RequestLogger`: never logs request bodies, so passwords
+  stay out of logs), `validate.go` (`ProtoValidator` runs the proto
   `buf.validate` rules via protovalidate — no codegen), `auth.go`
-  (`authMiddleware`: a `selector` guarding protected RPCs, injecting
-  JWT claims into `context`), `logging.go` (`requestLogger`: never logs
-  request bodies, so passwords stay out of logs).
+  (`TokenVerifier` interface + `TokenAuth`: extracts the bearer token,
+  verifies it, injects `AuthClaims` into `context`), `ratelimit.go`.
+- _What stays in `internal/server`_ is only the service-specific wiring:
+  `http.go`/`grpc.go` assemble the chain from `pkg/middleware`
+  (`pkgmw.RequestLogger`, `pkgmw.ProtoValidator`, `pkgmw.RateLimitServer`,
+  `pkgmw.RequestDecoder`/`ResponseEncoder`/`ErrorEncoder`), and `auth.go`
+  holds the `selector` that picks which RPCs are protected plus a tiny
+  `TokenVerifier` adapter bridging `biz.AuthUsecase` to `pkg/middleware`.
 - _JSON convention_: HTTP payloads are protojson (RFC 3339 timestamps,
   enums by name, snake_case) wrapped in `{code,message,reason,data,
   metadata}` with the HTTP status pinned to 200. kratos v3's built-in
-  `encoding/json` codec is deliberately overridden — it would emit
-  `{seconds,nanos}` timestamps and numeric enums. gRPC keeps native
-  status codes and is not enveloped.
+  `encoding/json` codec is deliberately overridden in
+  `pkg/middleware/codec.go` — it would emit `{seconds,nanos}` timestamps
+  and numeric enums. gRPC keeps native status codes and is not enveloped.
 
 **gateway (app/gateway)**
 
