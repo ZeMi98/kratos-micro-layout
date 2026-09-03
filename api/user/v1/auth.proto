@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package api.user.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+
+option go_package = "kratos-micro-layout/api/user/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.user.v1";
+
+// AuthService handles registration, login, and token management.
+service AuthService {
+  // Register creates a new user account with credentials.
+  rpc Register(RegisterRequest) returns (RegisterReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  // Login authenticates a user and returns tokens.
+  rpc Login(LoginRequest) returns (LoginReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  // Logout invalidates the current session.
+  rpc Logout(LogoutRequest) returns (LogoutReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+
+  // RefreshToken exchanges a valid refresh token for a new token pair.
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  // ChangePassword updates the authenticated user's password.
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordReply) {
+    option (google.api.http) = {
+      post: "/v1/auth/change-password"
+      body: "*"
+    };
+  }
+}
+
+// RegisterRequest is the request for Register.
+message RegisterRequest {
+  // Login username. Must be unique.
+  string username = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true,
+      string: {min_len: 3, max_len: 64}
+    }
+  ];
+
+  // Email address. Must be unique.
+  string email = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true,
+      string: {email: true, max_len: 255}
+    }
+  ];
+
+  // Plain-text password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+  string password = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true,
+      string: {min_len: 8, max_len: 72}
+    }
+  ];
+
+  // Display name (optional).
+  string nickname = 4 [(buf.validate.field).string = {max_len: 64}];
+
+  // Phone number (optional).
+  string phone = 5 [(buf.validate.field).string = {max_len: 32}];
+}
+
+// RegisterReply is the response for Register.
+message RegisterReply {
+  // ID of the newly created user.
+  string user_id = 1;
+
+  // Login username.
+  string username = 2;
+
+  // Email address.
+  string email = 3;
+}
+
+// LoginRequest is the request for Login.
+message LoginRequest {
+  // Login username.
+  string username = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Plain-text password.
+  string password = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+}
+
+// TokenPair is a pair of access and refresh tokens.
+message TokenPair {
+  // Short-lived access token (JWT, default 2h).
+  string access_token = 1;
+
+  // Long-lived refresh token (JWT, default 7d).
+  string refresh_token = 2;
+
+  // Access token TTL in seconds.
+  int64 expires_in = 3;
+
+  // Token type. Always "Bearer".
+  string token_type = 4;
+}
+
+// LoginReply is the response for Login.
+message LoginReply {
+  TokenPair tokens = 1;
+
+  // User ID.
+  string user_id = 2;
+
+  // Login username.
+  string username = 3;
+}
+
+// LogoutRequest is the request for Logout.
+message LogoutRequest {
+  // The access token to invalidate. Optional: when omitted, the token is taken
+  // from the Authorization header, which the auth middleware already validates.
+  string access_token = 1;
+}
+
+// LogoutReply is the response for Logout.
+message LogoutReply {}
+
+// RefreshTokenRequest is the request for RefreshToken.
+message RefreshTokenRequest {
+  // A valid refresh token.
+  string refresh_token = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+}
+
+// RefreshTokenReply is the response for RefreshToken.
+message RefreshTokenReply {
+  TokenPair tokens = 1;
+}
+
+// ChangePasswordRequest is the request for ChangePassword.
+message ChangePasswordRequest {
+  // Current password for verification.
+  string old_password = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+  string new_password = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true,
+      string: {min_len: 8, max_len: 72}
+    }
+  ];
+}
+
+// ChangePasswordReply is the response for ChangePassword.
+message ChangePasswordReply {}

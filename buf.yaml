@@ -1,0 +1,8 @@
+version: v2
+modules:
+  - path: api
+  - path: app/user_center/internal
+  - path: app/gateway/internal
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/bufbuild/protovalidate

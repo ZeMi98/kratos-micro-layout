@@ -1,0 +1,135 @@
+syntax = "proto3";
+// The gateway uses its own package so it can live in the same buf workspace
+// as the service templates without colliding with their "kratos.api" config
+// protos.
+package kratos.gateway;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "kratos-micro-layout/app/gateway/internal/conf;conf";
+
+// Bootstrap is the top-level configuration for the gateway.
+message Bootstrap {
+  Server server = 1;
+  Gateway gateway = 2;
+  Log log = 3;
+  Registry registry = 4;
+  Middleware middleware = 5;
+}
+
+// Server configures the HTTP transport the gateway listens on.
+message Server {
+  message HTTP {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  HTTP http = 1;
+}
+
+// Gateway configures routing and cross-origin policy.
+message Gateway {
+  // Routes map request path prefixes to backend services.
+  repeated Route routes = 1;
+  // Cors policy applied to every matched request. Optional.
+  Cors cors = 2;
+}
+
+// Route forwards one path prefix to a backend service.
+message Route {
+  // Path prefix matched against the incoming request path, e.g. "/v1/users".
+  string path_prefix = 1;
+  // Backend service name as registered in Nacos, without the ".http"
+  // suffix, e.g. "user_center".
+  string service = 2;
+  // Optional prefix rewrite: replaces path_prefix in the forwarded path.
+  // Empty keeps the original path unchanged.
+  string rewrite_prefix = 3;
+}
+
+// Cors configures the cross-origin resource sharing policy.
+message Cors {
+  // Allowed origins. "*" allows any origin.
+  repeated string allow_origins = 1;
+  // Allowed HTTP methods.
+  repeated string allow_methods = 2;
+  // Allowed request headers.
+  repeated string allow_headers = 3;
+  // Allow cookies and credentials.
+  bool allow_credentials = 4;
+  // How long browsers may cache the preflight response.
+  google.protobuf.Duration max_age = 5;
+}
+
+// Log configures the logging backend (standard library log/slog).
+message Log {
+  // Minimum log level: "debug", "info", "warn", "error".
+  string level = 1;
+  // Output target: "stdout", "stderr", or "file".
+  string output = 2;
+  // File path when output is "file".
+  string file_path = 3;
+  // Record encoding: "text" or "json". Default "text".
+  string format = 4;
+}
+
+// Registry configures the Nacos discovery backend the gateway resolves routes
+// through, and the Nacos config center it hot-reloads its own config from.
+// The gateway cannot start without discovery, so address is required.
+message Registry {
+  // Nacos server endpoints, comma-separated for a cluster
+  // ("host:port,host:port"). REQUIRED.
+  string address = 1;
+  // Nacos namespace ID. Empty uses the public namespace.
+  string namespace_id = 2;
+  // Nacos group. Empty uses DEFAULT_GROUP.
+  string group = 3;
+  // Nacos auth username. Optional.
+  string username = 4;
+  // Nacos auth password. Keep out of version control.
+  string password = 5;
+}
+
+// Middleware toggles the cross-cutting request middleware the gateway applies.
+message Middleware {
+  // Rate limiting sheds excess inbound traffic at the edge.
+  RateLimit ratelimit = 1;
+  // Circuit breaking fails fast when a backend service keeps erroring.
+  CircuitBreaker circuit_breaker = 2;
+}
+
+// RateLimit configures gateway-side rate limiting. The gateway registers raw
+// reverse-proxy handlers (HandlePrefix), which bypass kratos's middleware
+// chain, so limiting runs as an HTTP filter backed by a fixed token bucket —
+// the standard edge pattern. One bucket is shared by all routes because the
+// limiter is context-free; backend services add adaptive BBR limiting of their
+// own (see the service conf RateLimit, which also offers a "bbr" type).
+message RateLimit {
+  // Enable the edge rate-limit filter.
+  bool enabled = 1;
+  // Sustained requests per second allowed across the gateway.
+  int64 qps = 2;
+  // Burst size (short peak above qps). Defaults to qps when 0.
+  int64 burst = 3;
+}
+
+// CircuitBreaker trips per-upstream (one breaker per backend service) when that
+// backend keeps failing, so the gateway returns 503 immediately instead of
+// piling requests onto a sick service. Backed by sony/gobreaker.
+message CircuitBreaker {
+  // Enable per-upstream circuit breaking.
+  bool enabled = 1;
+  // Requests allowed through while half-open to probe recovery. Default 5.
+  uint32 max_requests = 2;
+  // How often the closed-state counts reset. Default 30s; durations use
+  // protojson seconds format (e.g. "30s").
+  google.protobuf.Duration interval = 3;
+  // How long the breaker stays open before probing half-open. Default 30s.
+  google.protobuf.Duration timeout = 4;
+  // Failure ratio (0..1) over at least min_requests that trips the breaker.
+  // Default 0.6.
+  double failure_ratio = 5;
+  // Minimum requests observed before the failure ratio can trip the breaker.
+  // Default 20.
+  uint32 min_requests = 6;
+}

@@ -1,0 +1,198 @@
+syntax = "proto3";
+
+package api.user.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "kratos-micro-layout/api/user/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.user.v1";
+
+// UserService manages user accounts.
+service UserService {
+  option (google.api.default_host) = "user.example.com";
+
+  // CreateUser creates a new user account.
+  rpc CreateUser(CreateUserRequest) returns (User) {
+    option (google.api.http) = {
+      post: "/v1/users"
+      body: "user"
+    };
+  }
+
+  // GetUser returns a user by ID.
+  rpc GetUser(GetUserRequest) returns (User) {
+    option (google.api.http) = {get: "/v1/users/{id}"};
+  }
+
+  // ListUsers lists user accounts with filtering, ordering, and pagination.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersReply) {
+    option (google.api.http) = {get: "/v1/users"};
+  }
+
+  // UpdateUser patches a user account.
+  rpc UpdateUser(UpdateUserRequest) returns (User) {
+    option (google.api.http) = {
+      patch: "/v1/users/{user.id}"
+      body: "user"
+    };
+  }
+
+  // DeleteUser soft-deletes a user account.
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserReply) {
+    option (google.api.http) = {delete: "/v1/users/{id}"};
+  }
+}
+
+// UserStatus is the lifecycle state of a user account.
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_DISABLED = 2;
+  USER_STATUS_DELETED = 3;
+}
+
+// User is the user account resource.
+message User {
+  // Unique identifier (UUIDv7).
+  string id = 1 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    string: {uuid: true}
+  }];
+
+  // Login username. Unique across the system.
+  // The shared resource is reused by UpdateUser (PATCH), so rules ignore the
+  // zero value: a patch that omits username skips these checks, while a create
+  // (which always carries a username) enforces them. Presence on create is
+  // guaranteed by the biz layer.
+  string username = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      ignore: IGNORE_IF_ZERO_VALUE
+      string: {
+        min_len: 3
+        max_len: 64
+      }
+    }
+  ];
+
+  // Email address. Unique across the system.
+  string email = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      ignore: IGNORE_IF_ZERO_VALUE
+      string: {
+        email: true
+        max_len: 255
+      }
+    }
+  ];
+
+  // Phone number (optional).
+  string phone = 4 [(buf.validate.field).string = {max_len: 32}];
+
+  // Display name.
+  string nickname = 5 [(buf.validate.field).string = {max_len: 64}];
+
+  // Avatar URL.
+  string avatar = 6 [(buf.validate.field).string = {max_len: 512}];
+
+  // Lifecycle status. Server-assigned; reads filter out deleted accounts.
+  UserStatus status = 7;
+
+  // Server-assigned creation timestamp.
+  google.protobuf.Timestamp created_at = 8;
+
+  // Server-assigned last-update timestamp.
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+// CreateUserRequest is the request message for CreateUser.
+message CreateUserRequest {
+  User user = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Plain-text password for the new account. Write-only; never returned on
+  // the User resource. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+  string password = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true
+      string: {
+        min_len: 8
+        max_len: 72
+      }
+    }
+  ];
+}
+
+// GetUserRequest is the request message for GetUser.
+message GetUserRequest {
+  // User ID (UUID string).
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true
+      string: {uuid: true}
+    }
+  ];
+}
+
+// ListUsersRequest is the request message for ListUsers.
+message ListUsersRequest {
+  // Maximum number of users to return. Default 20, max 100.
+  int32 page_size = 1;
+
+  // Opaque pagination cursor returned by a previous call.
+  string page_token = 2;
+
+  // AIP-160 filter expression, e.g. `username = "alice"`.
+  string filter = 3;
+
+  // AIP-132 order_by expression, e.g. `created_at desc`.
+  string order_by = 4;
+}
+
+// ListUsersReply is the response message for ListUsers.
+message ListUsersReply {
+  repeated User users = 1;
+
+  // Token to retrieve the next page. Empty when there are no more results.
+  string next_page_token = 2;
+
+  // Total count of matching users (for display only, not for pagination).
+  int64 total_count = 3;
+}
+
+// UpdateUserRequest is the request message for UpdateUser.
+message UpdateUserRequest {
+  User user = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Field mask specifying which fields to update.
+  google.protobuf.FieldMask update_mask = 2 [(buf.validate.field).required = true];
+}
+
+// DeleteUserRequest is the request message for DeleteUser.
+message DeleteUserRequest {
+  // User ID (UUID string).
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field) = {
+      required: true
+      string: {uuid: true}
+    }
+  ];
+}
+
+// DeleteUserReply is the response message for DeleteUser.
+message DeleteUserReply {}

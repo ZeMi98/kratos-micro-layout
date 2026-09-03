@@ -1,0 +1,74 @@
+# Gateway configuration.
+#
+# The gateway is the single traffic entry: it forwards each route to the
+# backend service resolved through Nacos. The local file is the base; when
+# `registry.address` points at Nacos, the remote config-center entry
+# `gateway.yaml` overrides these values (hot-reloadable).
+#
+# Environment overrides use ${VAR:default} placeholders. Env vars are read with
+# the KRATOS_ prefix, but kratos's env source only strips that prefix and one
+# leading underscore — it does not lowercase keys or map "_" to "." — so there
+# is no env form for a nested path like `registry.address`; reference it with a
+# placeholder instead (e.g. `address: ${REGISTRY_ADDRESS:127.0.0.1:8848}`).
+
+server:
+  http:
+    addr: 0.0.0.0:8080
+    timeout: 10s
+
+gateway:
+  # Each route proxies one path prefix to a backend service. The service name
+  # is the plain kratos service name — the gateway resolves it to the Nacos
+  # "<service>.http" entry automatically. Add one block per backend prefix.
+  routes:
+    - path_prefix: /v1/auth
+      service: user_center
+    - path_prefix: /v1/users
+      service: user_center
+  cors:
+    # Prefer explicit origins in production; "*" is for local development
+    # only, and never combine "*" with allow_credentials: true.
+    allow_origins:
+      - "*"
+    allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+    allow_headers: [Content-Type, Authorization]
+    allow_credentials: false
+    max_age: 43200s # 12h; durations use protojson seconds format
+
+log:
+  level: info
+  output: stdout
+  format: text
+
+# The gateway cannot start without discovery: every route resolves its
+# backend instances through Nacos, which also drives the remote config
+# center (data ID `gateway.yaml`, hot-reloaded).
+registry:
+  # Nacos server endpoints, comma-separated for a cluster ("host:port,host:port").
+  address: 127.0.0.1:8848 # REQUIRED
+  namespace_id: ""        # empty uses the public namespace
+  group: ""               # empty uses DEFAULT_GROUP
+  username: ""            # Nacos auth (optional)
+  password: ""            # Nacos auth — keep real secrets in the config center
+
+# Cross-cutting gateway middleware. Each block is optional; omit it or set
+# enabled: false to skip it.
+middleware:
+  # Edge rate limiting: a fixed token bucket shared by all routes. The gateway's
+  # raw reverse-proxy routes bypass kratos middleware, so this runs as an HTTP
+  # filter; backend services add their own adaptive BBR limiting on top.
+  ratelimit:
+    enabled: false
+    qps: 1000             # sustained requests/second across the gateway
+    burst: 2000           # short peak above qps (defaults to qps when 0)
+  # Per-upstream circuit breaking: when a backend keeps returning 5xx its circuit
+  # opens and the gateway sheds with a fast 503 instead of piling on, then probes
+  # recovery after `timeout`. One breaker per route, so a sick backend never
+  # takes down the healthy ones.
+  circuit_breaker:
+    enabled: false
+    max_requests: 5       # probes let through while half-open
+    interval: 30s         # closed-state counter reset window
+    timeout: 30s          # how long to stay open before probing half-open
+    failure_ratio: 0.6    # failure ratio (0..1) that trips the breaker
+    min_requests: 20      # samples required before the ratio can trip it

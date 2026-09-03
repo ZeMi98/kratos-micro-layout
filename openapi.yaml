@@ -1,0 +1,425 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+servers:
+    - url: https://user.example.com
+paths:
+    /v1/auth/change-password:
+        post:
+            tags:
+                - AuthService
+            description: ChangePassword updates the authenticated user's password.
+            operationId: AuthService_ChangePassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.ChangePasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.ChangePasswordReply'
+    /v1/auth/login:
+        post:
+            tags:
+                - AuthService
+            description: Login authenticates a user and returns tokens.
+            operationId: AuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.LoginReply'
+    /v1/auth/logout:
+        post:
+            tags:
+                - AuthService
+            description: Logout invalidates the current session.
+            operationId: AuthService_Logout
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.LogoutRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.LogoutReply'
+    /v1/auth/refresh:
+        post:
+            tags:
+                - AuthService
+            description: RefreshToken exchanges a valid refresh token for a new token pair.
+            operationId: AuthService_RefreshToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.RefreshTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.RefreshTokenReply'
+    /v1/auth/register:
+        post:
+            tags:
+                - AuthService
+            description: Register creates a new user account with credentials.
+            operationId: AuthService_Register
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.RegisterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.RegisterReply'
+    /v1/users:
+        get:
+            tags:
+                - UserService
+            description: ListUsers lists user accounts with filtering, ordering, and pagination.
+            operationId: UserService_ListUsers
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: Maximum number of users to return. Default 20, max 100.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: Opaque pagination cursor returned by a previous call.
+                  schema:
+                    type: string
+                - name: filter
+                  in: query
+                  description: AIP-160 filter expression, e.g. `username = "alice"`.
+                  schema:
+                    type: string
+                - name: orderBy
+                  in: query
+                  description: AIP-132 order_by expression, e.g. `created_at desc`.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.ListUsersReply'
+        post:
+            tags:
+                - UserService
+            description: CreateUser creates a new user account.
+            operationId: UserService_CreateUser
+            parameters:
+                - name: password
+                  in: query
+                  description: |-
+                    Plain-text password for the new account. Write-only; never returned on
+                     the User resource. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.User'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.User'
+    /v1/users/{id}:
+        get:
+            tags:
+                - UserService
+            description: GetUser returns a user by ID.
+            operationId: UserService_GetUser
+            parameters:
+                - name: id
+                  in: path
+                  description: User ID (UUID string).
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.User'
+        delete:
+            tags:
+                - UserService
+            description: DeleteUser soft-deletes a user account.
+            operationId: UserService_DeleteUser
+            parameters:
+                - name: id
+                  in: path
+                  description: User ID (UUID string).
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.DeleteUserReply'
+    /v1/users/{user.id}:
+        patch:
+            tags:
+                - UserService
+            description: UpdateUser patches a user account.
+            operationId: UserService_UpdateUser
+            parameters:
+                - name: user.id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: Field mask specifying which fields to update.
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.user.v1.User'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.user.v1.User'
+components:
+    schemas:
+        api.user.v1.ChangePasswordReply:
+            type: object
+            properties: {}
+            description: ChangePasswordReply is the response for ChangePassword.
+        api.user.v1.ChangePasswordRequest:
+            required:
+                - oldPassword
+                - newPassword
+            type: object
+            properties:
+                oldPassword:
+                    type: string
+                    description: Current password for verification.
+                newPassword:
+                    type: string
+                    description: New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+            description: ChangePasswordRequest is the request for ChangePassword.
+        api.user.v1.DeleteUserReply:
+            type: object
+            properties: {}
+            description: DeleteUserReply is the response message for DeleteUser.
+        api.user.v1.ListUsersReply:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.user.v1.User'
+                nextPageToken:
+                    type: string
+                    description: Token to retrieve the next page. Empty when there are no more results.
+                totalCount:
+                    type: string
+                    description: Total count of matching users (for display only, not for pagination).
+            description: ListUsersReply is the response message for ListUsers.
+        api.user.v1.LoginReply:
+            type: object
+            properties:
+                tokens:
+                    $ref: '#/components/schemas/api.user.v1.TokenPair'
+                userId:
+                    type: string
+                    description: User ID.
+                username:
+                    type: string
+                    description: Login username.
+            description: LoginReply is the response for Login.
+        api.user.v1.LoginRequest:
+            required:
+                - username
+                - password
+            type: object
+            properties:
+                username:
+                    type: string
+                    description: Login username.
+                password:
+                    type: string
+                    description: Plain-text password.
+            description: LoginRequest is the request for Login.
+        api.user.v1.LogoutReply:
+            type: object
+            properties: {}
+            description: LogoutReply is the response for Logout.
+        api.user.v1.LogoutRequest:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                    description: |-
+                        The access token to invalidate. Optional: when omitted, the token is taken
+                         from the Authorization header, which the auth middleware already validates.
+            description: LogoutRequest is the request for Logout.
+        api.user.v1.RefreshTokenReply:
+            type: object
+            properties:
+                tokens:
+                    $ref: '#/components/schemas/api.user.v1.TokenPair'
+            description: RefreshTokenReply is the response for RefreshToken.
+        api.user.v1.RefreshTokenRequest:
+            required:
+                - refreshToken
+            type: object
+            properties:
+                refreshToken:
+                    type: string
+                    description: A valid refresh token.
+            description: RefreshTokenRequest is the request for RefreshToken.
+        api.user.v1.RegisterReply:
+            type: object
+            properties:
+                userId:
+                    type: string
+                    description: ID of the newly created user.
+                username:
+                    type: string
+                    description: Login username.
+                email:
+                    type: string
+                    description: Email address.
+            description: RegisterReply is the response for Register.
+        api.user.v1.RegisterRequest:
+            required:
+                - username
+                - email
+                - password
+            type: object
+            properties:
+                username:
+                    type: string
+                    description: Login username. Must be unique.
+                email:
+                    type: string
+                    description: Email address. Must be unique.
+                password:
+                    type: string
+                    description: Plain-text password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
+                nickname:
+                    type: string
+                    description: Display name (optional).
+                phone:
+                    type: string
+                    description: Phone number (optional).
+            description: RegisterRequest is the request for Register.
+        api.user.v1.TokenPair:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                    description: Short-lived access token (JWT, default 2h).
+                refreshToken:
+                    type: string
+                    description: Long-lived refresh token (JWT, default 7d).
+                expiresIn:
+                    type: string
+                    description: Access token TTL in seconds.
+                tokenType:
+                    type: string
+                    description: Token type. Always "Bearer".
+            description: TokenPair is a pair of access and refresh tokens.
+        api.user.v1.User:
+            required:
+                - username
+                - email
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Unique identifier (UUIDv7).
+                username:
+                    type: string
+                    description: |-
+                        Login username. Unique across the system.
+                         The shared resource is reused by UpdateUser (PATCH), so rules ignore the
+                         zero value: a patch that omits username skips these checks, while a create
+                         (which always carries a username) enforces them. Presence on create is
+                         guaranteed by the biz layer.
+                email:
+                    type: string
+                    description: Email address. Unique across the system.
+                phone:
+                    type: string
+                    description: Phone number (optional).
+                nickname:
+                    type: string
+                    description: Display name.
+                avatar:
+                    type: string
+                    description: Avatar URL.
+                status:
+                    type: integer
+                    description: Lifecycle status. Server-assigned; reads filter out deleted accounts.
+                    format: enum
+                createdAt:
+                    type: string
+                    description: Server-assigned creation timestamp.
+                    format: date-time
+                updatedAt:
+                    type: string
+                    description: Server-assigned last-update timestamp.
+                    format: date-time
+            description: User is the user account resource.
+tags:
+    - name: AuthService
+      description: AuthService handles registration, login, and token management.
+    - name: UserService
+      description: UserService manages user accounts.

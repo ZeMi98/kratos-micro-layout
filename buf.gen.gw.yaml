@@ -1,0 +1,7 @@
+version: v2
+# Generates the gateway config types from internal conf protos.
+# Usage: buf generate --template buf.gen.gw.yaml --path app/gateway/internal
+plugins:
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]
+    out: app/gateway/internal
+    opt: paths=source_relative

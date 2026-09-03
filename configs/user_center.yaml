@@ -1,0 +1,67 @@
+# user_center service configuration.
+#
+# This local file is always the base. When `registry.address` points at a
+# Nacos server, the remote config-center entry `user_center.yaml` is merged
+# on top (hot-reloadable) — the recommended home for per-environment values
+# and secrets.
+#
+# Environment overrides use ${VAR:default} placeholders, resolved from the
+# merged config. Env vars are read with the KRATOS_ prefix, but kratos's env
+# source only strips that prefix and one leading underscore — it neither
+# lowercases keys nor maps "_" to "." — so KRATOS_FOO lands as a top-level key
+# FOO, and there is no env form for a nested path like `auth.jwt_secret`. To
+# drive a value from the environment, reference it with a placeholder, e.g.
+# `jwt_secret: ${AUTH_JWT_SECRET:default}` reads KRATOS_AUTH_JWT_SECRET.
+
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+
+data:
+  database:
+    driver: sqlite        # "sqlite" (pure-Go, no CGO) or "mysql"
+    source: user_center.db # sqlite file path, or a mysql DSN
+    orm: ent              # "ent" or "gorm" — must match the kept internal/data subpackage
+    debug: true
+    auto_migrate: true
+  redis:
+    addr: 127.0.0.1:6379
+
+auth:
+  # Inject the signing secret from the environment: KRATOS_AUTH_JWT_SECRET is
+  # read as key AUTH_JWT_SECRET and resolved into this placeholder. The default
+  # is for local development only — never ship it to production.
+  jwt_secret: ${AUTH_JWT_SECRET:change-me-in-production}
+  # Durations use protojson format: plain seconds with an "s" suffix.
+  access_token_ttl: 7200s    # 2h
+  refresh_token_ttl: 604800s # 7d
+
+log:
+  level: info
+  output: stdout
+  format: text
+
+# Service registration, discovery and remote config — all backed by Nacos.
+# An empty address disables registration and skips the remote config source
+# (the zero-dependency local default): the yaml below stays the sole input.
+registry:
+  # Nacos server endpoints, comma-separated for a cluster ("host:port,host:port").
+  address: ""             # e.g. "127.0.0.1:8848"; empty disables registration + config center
+  namespace_id: ""        # empty uses the public namespace
+  group: ""               # empty uses DEFAULT_GROUP
+  username: ""            # Nacos auth (optional)
+  password: ""            # Nacos auth — keep real secrets in the config center
+
+# Cross-cutting request middleware, applied to both the HTTP and gRPC servers.
+# Each block is optional; omit it or set enabled: false to leave that middleware
+# out of the chain entirely.
+middleware:
+  ratelimit:
+    enabled: false        # true sheds overload with 429 once the ceiling is hit
+    type: bbr             # "bbr" (kratos adaptive, default) or "token" (fixed qps/burst)
+    qps: 100              # token only: sustained requests/second
+    burst: 200            # token only: peak above qps (defaults to qps when 0)

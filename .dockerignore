@@ -1,0 +1,7 @@
+# Keep image builds lean: local artifacts never belong in the build context.
+.git
+bin
+*.db
+*.log
+.vscode
+.idea

@@ -1,0 +1,3 @@
+[submodule "app/user_center"]
+	path = app/user_center
+	url = https://github.com/ZeMi98/kratos-micro-sub-service-layout.git

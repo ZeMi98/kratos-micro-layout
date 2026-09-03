@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package api.user.v1;
+
+option go_package = "kratos-micro-layout/api/user/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.user.v1";
+
+// ErrorReason enumerates all user-domain error codes.
+enum ErrorReason {
+  // Default unspecified error.
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // The requested user was not found.
+  USER_NOT_FOUND = 1;
+
+  // A user with the same username or email already exists.
+  USER_ALREADY_EXISTS = 2;
+
+  // The request contains invalid arguments.
+  USER_INVALID_ARGUMENT = 3;
+
+  // The supplied credentials are invalid.
+  AUTH_INVALID_CREDENTIALS = 4;
+
+  // The access or refresh token has expired.
+  AUTH_TOKEN_EXPIRED = 5;
+
+  // The token is malformed or tampered with.
+  AUTH_TOKEN_INVALID = 6;
+
+  // The request is not authenticated.
+  AUTH_UNAUTHORIZED = 7;
+}
