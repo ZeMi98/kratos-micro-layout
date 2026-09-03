@@ -23,8 +23,8 @@ server:
 
 data:
   database:
-    driver: sqlite        # "sqlite" (pure-Go, no CGO) or "mysql"
-    source: user_center.db # sqlite file path, or a mysql DSN
+    driver: sqlite        # "sqlite" (pure-Go, no CGO), "mysql", or "postgres"
+    source: user_center.db # sqlite file path, mysql DSN, or postgres URL
     orm: ent              # "ent" or "gorm" — must match the kept internal/data subpackage
     debug: true
     auto_migrate: true
