@@ -38,10 +38,12 @@ submodule** (the standalone service-template repo `kratos-micro-sub-service-layo
 and a **nested Go module** joined to the root through the committed `go.work`.
 A plain `git clone` — and `kratos new` — does NOT populate a submodule, so an
 uninitialized `app/user_center/` (empty dir) breaks EVERY `go` command through
-`go.work`. Run `make init` (or `git submodule update --init --recursive`) first;
-the Makefile's go targets (`build`/`test`/`run-*`/`ent`/`wire`) carry a
-`submodule-guard` that fails with a clear message otherwise. Because it is a
-nested module, the root's bare `./...` skips it — `make build`/`test` list
+`go.work`. Populate it yourself once — clone with `--recurse-submodules`, run
+`git submodule update --init --recursive`, or scaffold it the way you'd add any
+service (`kratos new app/user_center --nomod -r <kratos-micro-sub-service-layout>`).
+The Makefile deliberately does NOT manage this; `make init` only installs the
+codegen CLIs. Because it is a nested module, the root's bare `./...` skips it —
+`make build`/`test` list
 `./app/user_center/...` explicitly, deps are added only at the root (`go get`),
 and pruning uses `make tidy` (never a bare `go mod tidy`, which would strip the
 deps only that module uses).

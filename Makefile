@@ -15,31 +15,21 @@
 # Generated files are committed, so a source change and its regeneration
 # belong in the same commit.
 
-VERSION := $(shell git describe --tags --always)
+VERSION := $(shell git describe --tags --always 2>/dev/null || echo dev)
 
-.PHONY: init submodule-init submodule-guard api config ent wire generate all build \
+.PHONY: init api config ent wire generate all build \
 	test run-user-center run-gateway middleware-up middleware-down middleware-search-up \
 	tidy help
 
-# app/user_center is a git submodule (the standalone service-template repo). A plain
-# `git clone` — and `kratos new` — does NOT populate it, which leaves go.work pointing
-# at an empty dir so EVERY go command fails with a cryptic "module not found". `init`
-# pulls it in; `submodule-guard` (a prerequisite of the go targets below) fails fast
-# with a clear message when it is still missing.
-init: submodule-init ## init the git submodule + install the codegen CLIs (buf, wire)
+# app/user_center is the example service and a git submodule (the standalone
+# service-template repo kratos-micro-sub-service-layout). Neither `git clone` nor
+# `kratos new` fetches submodules, so populate it yourself once after cloning — either
+# `git submodule update --init --recursive`, or scaffold it the way you'd add any
+# service: `kratos new app/user_center --nomod -r https://github.com/ZeMi98/kratos-micro-sub-service-layout.git`.
+# The Makefile deliberately does NOT manage this; `init` only installs the codegen CLIs.
+init: ## install the codegen CLIs (buf, wire)
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/bufbuild/buf/cmd/buf@latest
-
-submodule-init: ## fetch/initialize the app/user_center git submodule
-	@if [ -f .gitmodules ]; then git submodule update --init --recursive; \
-	else echo "  no .gitmodules — nothing to init"; fi
-
-submodule-guard:
-	@if [ ! -f app/user_center/go.mod ]; then \
-		echo "ERROR: app/user_center is empty — it is a git submodule that is not initialized."; \
-		echo "       Run 'make init' (or 'git submodule update --init --recursive'), then retry."; \
-		exit 1; \
-	fi
 
 api: ## regenerate the public API: protos -> Go/gRPC/HTTP stubs + one OpenAPI spec per api/<domain>
 	buf generate --template buf.gen.yaml
@@ -60,10 +50,10 @@ config: ## regenerate service config types: app/*/internal/conf/*.proto -> *.pb.
 	buf generate --template buf.gen.config.yaml
 	buf generate --template buf.gen.gw.yaml --path app/gateway/internal/conf/gateway.proto
 
-ent: submodule-guard ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
+ent: ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
 	cd app/user_center/internal/data/ent && go run generate.go
 
-wire: submodule-guard ## regenerate wire_gen.go after changing a ProviderSet or constructor signature
+wire: ## regenerate wire_gen.go after changing a ProviderSet or constructor signature
 	cd app/user_center/cmd/user_center && wire
 
 generate: ent wire ## regenerate ORM + DI code (the usual follow-up to a biz/data change)
@@ -72,16 +62,16 @@ all: api config generate ## regenerate everything: protos, configs, ORM and DI
 
 # The nested app/user_center module is invisible to the root module's bare ./...,
 # so build and test list it explicitly.
-build: submodule-guard ## compile both binaries into bin/
+build: ## compile both binaries into bin/
 	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
 
-test: submodule-guard ## run every test in both modules
+test: ## run every test in both modules
 	go test ./... ./app/user_center/...
 
-run-user-center: submodule-guard ## run user_center locally (configs/user_center.yaml; needs MySQL)
+run-user-center: ## run user_center locally (configs/user_center.yaml; needs MySQL)
 	go run ./app/user_center/cmd/user_center
 
-run-gateway: submodule-guard ## run the gateway locally (configs/gateway.yaml; needs Nacos)
+run-gateway: ## run the gateway locally (configs/gateway.yaml; needs Nacos)
 	go run ./app/gateway/cmd/gateway
 
 middleware-up: ## start the local middleware stack (MySQL + Redis + Nacos) from deploy/middleware/

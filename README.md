@@ -82,7 +82,7 @@ use (
 - **对命令行的影响**：嵌套模块会被父模块的裸 `./...` 排除，故 `Makefile` 的 `build`/`test` 显式带上 `./app/user_center/...`；工作区内 `cd app/user_center && go build ./...` 与根目录 `go build ./app/user_center/...` 均可正常解析。
 - **加依赖只在根目录做**：根模块自身并不 import ent/mysql/pgx（只有 user_center 用），因此**不要在根目录裸跑 `go mod tidy`** —— 它会把"仅 user_center 使用"的依赖当作无用而剪掉，破坏工作区解析。新增依赖统一用 `go get <module>` 加到根 `go.mod`；确实要清理时用 `make tidy`（临时隐藏 `go.work` 与嵌套 `go.mod`、把整棵树还原成单模块后再 tidy，退出时必定恢复）。`make generate` 刻意不含 tidy。
 - `go.work.sum` 是工作区派生的校验文件，已在 `.gitignore` 忽略；`go.work` 本身必须提交，否则新克隆无法解析 user_center。
-- **`app/user_center` 是 git 子模块**：`git clone` / `kratos new` 不会自动拉取，未初始化时该目录为空、`go.work` 解析失败。克隆后先 `git submodule update --init --recursive`（或 `make init`）；`Makefile` 的 go 目标（`build`/`test`/`run-*`/`ent`/`wire`）都挂了 `submodule-guard`，缺子模块时会给出明确提示而非费解的报错。
+- **`app/user_center` 是 git 子模块**：`git clone` / `kratos new` 不会自动拉取，未初始化时该目录为空、`go.work` 解析失败。克隆后自行拉取一次：`git clone --recurse-submodules`、或 `git submodule update --init --recursive`、或按新增服务的方式 `kratos new app/user_center --nomod -r https://github.com/ZeMi98/kratos-micro-sub-service-layout.git`。`Makefile` 不再管理子模块（`make init` 只装 buf/wire CLI）。
 - **`go:embed` 不能跨模块**：这也是 OpenAPI 文档落在根模块的 `pkg/docs/` 而不是 `app/user_center/` 里的原因（见「API 文档」）。
 
 ## 快速开始
@@ -93,7 +93,7 @@ use (
 > [kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)）。
 > `git clone` 与 `kratos new` **都不会**自动拉取子模块；缺了它，`go.work` 会指向一个空目录，
 > 于是所有 `go build` / `make` 都以费解的“找不到模块”失败。克隆后务必初始化子模块 ——
-> `make init` 已包含这一步，也可手动 `git submodule update --init --recursive`。
+> 克隆时带 `--recurse-submodules`，或事后手动 `git submodule update --init --recursive`（`Makefile` 不再代管这一步）。
 
 ```bash
 # 安装 Kratos CLI（若未安装）
@@ -107,7 +107,10 @@ cd my-project
 kratos new my-project -r https://github.com/ZeMi98/kratos-micro-layout.git
 cd my-project
 
-# 初始化子模块 + 安装 buf、wire CLI（上一步没带 --recurse-submodules 时在此补救）
+# 若上一步没带 --recurse-submodules，先手动拉取子模块
+git submodule update --init --recursive
+
+# 安装 buf、wire CLI（代码生成工具）
 make init
 ```
 
@@ -681,8 +684,7 @@ docker run -p 8080:8080 \
 
 | 命令 | 作用 |
 |---|---|
-| `make init` | 初始化 git 子模块 + 安装 buf、wire CLI |
-| `make submodule-init` | 只拉取/初始化 `app/user_center` 子模块（`make init` 已含此步） |
+| `make init` | 安装 buf、wire CLI（代码生成工具）；不含子模块初始化 |
 | `make api` | `api/**.proto` → Go/gRPC/HTTP 桩 + `pkg/docs/specs/<domain>/openapi.yaml`（每 domain 一份） |
 | `make config` | 各服务 `internal/conf/*.proto` → `*.pb.go` |
 | `make ent` | 改 ent schema 后重新生成 ORM 代码 |
