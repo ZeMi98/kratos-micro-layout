@@ -32,9 +32,10 @@ Thumbs.db
 *.cert
 *.key
 *.log
-bin/
-# local sqlite databases from data.database.driver=sqlite
+# stray local database files left behind by a smoke test
 *.db
+# staging dir for per-domain OpenAPI generation (`make api` moves these into pkg/docs/specs/)
+.oapi/
 
 # Develop tools
 .vscode/

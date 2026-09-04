@@ -1,8 +1,8 @@
 # kratos-micro-layout
 
-基于 [Kratos v3](https://go-kratos.dev) 的微服务 monorepo 模板：一个 HTTP 网关 + 一个用户中心服务模板 + 共享基础库（日志、Nacos、传输中间件套件、JWT 令牌引擎、ID 生成、雪花算法）。
+基于 [Kratos v3](https://go-kratos.dev) 的微服务 monorepo 模板：一个 HTTP 网关 + 一个用户中心服务模板 + 共享基础库（日志、Nacos、传输中间件套件、JWT 令牌引擎、ID 生成、雪花算法、API 文档）。
 
-数据库保留 ent / gorm 两套实现，按需删减；日志统一用标准库 **log/slog**（Text/JSON + lumberjack 轮转）；服务注册 / 发现 / 配置中心统一由 **Nacos** 承担（kratos 生态中最主流、也是唯一同时提供注册与热更新配置的后端），网关内建**限流 + 熔断**，分布式 ID 由 `pkg/snowflake` 就地生成，全部配置集中在根目录 `configs/`。
+存储层只保留 **ent**（schema 用 Go 写，客户端代码生成），默认 **MySQL**、两行配置即可切到 PostgreSQL（见 [docs/ent.md](docs/ent.md)）；日志统一用标准库 **log/slog**（Text/JSON + lumberjack 轮转）；服务注册 / 发现 / 配置中心统一由 **Nacos** 承担（kratos 生态中最主流、也是唯一同时提供注册与热更新配置的后端）；网关内建**限流 + 熔断**；HTTP 响应统一为 `code` / `message` / `data` **三字段信封**；API 文档由 buf 生成、`go:embed` 内嵌进二进制，服务自带 `/swagger`；分布式 ID 由 `pkg/snowflake` 就地生成。全部配置集中在根目录 `configs/`，本地中间件在 `deploy/`。
 
 ## 架构
 
@@ -16,11 +16,11 @@
                                ▼
                         ┌─────────────┐
                         │ user_center │  :8000 HTTP / :9000 gRPC
-                        │             │  服务端限流(BBR/token) + 鉴权 + 校验
+                        │             │  限流(BBR/token) + 鉴权 + 校验 + /swagger
                         └──────┬──────┘
                                │
                  ┌─────────────┴─────────────┐
-                 │  biz ─► data (ent|gorm)   │  sqlite(默认)/mysql/postgres
+                 │     biz ─► data (ent)     │  mysql(默认)/postgres
                  └───────────────────────────┘
 ```
 
@@ -41,15 +41,15 @@ api/user/v1/                 服务对外的 proto 契约（DTO）与生成代�
 app/user_center/             服务模板：用户中心（登录注册/鉴权/改密）
   cmd/user_center/           入口 + Wire 注入
   internal/conf/             配置 proto（make config 生成）
-  internal/server/           HTTP/gRPC server 装配 + 鉴权 selector（中间件本体在 pkg/middleware）
+  internal/server/           HTTP/gRPC server 装配 + 鉴权 selector + 文档路由挂载
   internal/service/          DTO ↔ DO 转换层
   internal/biz/              领域模型、用例、Repo 接口、错误；JWT/ID 引擎的薄 conf provider
-  internal/data/             薄入口：ProviderSet 指向所保留的 ORM
-    ent/                     Ent 实现（schema + 生成代码 + repo）
-    gorm/                    GORM 实现（model + repo）
+  internal/data/             薄入口：ProviderSet 指向 ent 子包
+    ent/                     ent schema + 生成代码 + repo（自包含，唯一存储实现）
 app/gateway/                 网关（无 biz/data，手工装配）
   internal/proxy/            服务发现 + selector 负载均衡 + 反向代理 + 每后端熔断
   internal/server/           监听器、CORS、边缘限流 filter、路由注册
+pkg/docs/                    API 文档：make api 按 domain 生成的 specs/<domain>/openapi.yaml（go:embed）+ /swagger UI
 pkg/log/                     日志构建：标准库 log/slog（Text/JSON）+ lumberjack 文件轮转
 pkg/middleware/              可复用传输中间件：鉴权、编解码(信封+protojson)、日志、校验、限流
 pkg/jwt/                     HS256 令牌引擎（Manager/Claims）：签发与校验 access/refresh token
@@ -58,7 +58,9 @@ pkg/nacos/                   Nacos 注册/发现、配置中心 Source 封装
 pkg/snowflake/               Twitter Snowflake 分布式 ID 生成器（64-bit，无协调、可排序）
 configs/user_center.yaml     每服务一份配置，集中存放
 configs/gateway.yaml
-Makefile / buf*.yaml         代码生成入口
+deploy/                      部署物料：中间件 docker-compose；迁移 SQL 放 deploy/script/
+docs/                        专题文档：ent.md（存储层全流程）
+Makefile / buf*.yaml         代码生成入口（`make` 或 `make help` 列出全部目标）
 Dockerfile                   参数化构建任意服务的镜像
 ```
 
@@ -76,10 +78,11 @@ use (
 ```
 
 - **为什么 user_center 必须有 `go.mod`**：`kratos new --nomod -r <repo>` 生成新服务时，CLI 会读取模板 `go.mod` 的 module path 作为替换基准；缺了它直接报错。所以 `app/user_center/go.mod` 不能删。
-- **为什么它是最小的**：`app/user_center/go.mod` 只有 `module` + `go` 两行，不列任何 `require`。它对第三方依赖（kratos、ent/gorm、pgx…）以及对根模块 `api/`、`pkg/` 的引用，全部经 `go.work` 从**根模块的构建列表**解析 —— 服务模板因此不必重复维护一份依赖清单。
+- **为什么它是最小的**：`app/user_center/go.mod` 只有 `module` + `go` 两行，不列任何 `require`。它对第三方依赖（kratos、ent、mysql、pgx…）以及对根模块 `api/`、`pkg/` 的引用，全部经 `go.work` 从**根模块的构建列表**解析 —— 服务模板因此不必重复维护一份依赖清单。
 - **对命令行的影响**：嵌套模块会被父模块的裸 `./...` 排除，故 `Makefile` 的 `build`/`test` 显式带上 `./app/user_center/...`；工作区内 `cd app/user_center && go build ./...` 与根目录 `go build ./app/user_center/...` 均可正常解析。
-- **加依赖只在根目录做**：根模块自身并不 import ent/gorm/pgx（只有 user_center 用），因此**不要在根目录裸跑 `go mod tidy`** —— 它会把“仅 user_center 使用”的依赖当作无用而剪掉，破坏工作区解析。新增依赖统一用 `go get <module>` 加到根 `go.mod`（`make generate` 已刻意不含 tidy）。
+- **加依赖只在根目录做**：根模块自身并不 import ent/mysql/pgx（只有 user_center 用），因此**不要在根目录裸跑 `go mod tidy`** —— 它会把"仅 user_center 使用"的依赖当作无用而剪掉，破坏工作区解析。新增依赖统一用 `go get <module>` 加到根 `go.mod`；确实要清理时用 `make tidy`（临时隐藏 `go.work` 与嵌套 `go.mod`、把整棵树还原成单模块后再 tidy，退出时必定恢复）。`make generate` 刻意不含 tidy。
 - `go.work.sum` 是工作区派生的校验文件，已在 `.gitignore` 忽略；`go.work` 本身必须提交，否则新克隆无法解析 user_center。
+- **`go:embed` 不能跨模块**：这也是 OpenAPI 文档落在根模块的 `pkg/docs/` 而不是 `app/user_center/` 里的原因（见「API 文档」）。
 
 ## 快速开始
 
@@ -92,6 +95,7 @@ go install github.com/go-kratos/kratos/cmd/kratos/v3@latest
 # 基于本模板创建项目（替换 REPO 为你的 fork 地址）
 kratos new my-project -r https://github.com/ZeMi98/kratos-micro-layout.git
 cd my-project
+make init          # 安装 buf、wire CLI
 ```
 
 ### 2. 在项目内新增微服务
@@ -112,26 +116,43 @@ kratos new app/order --nomod -r https://github.com/ZeMi98/kratos-micro-sub-servi
 1. 全局替换模块路径中的 `user_center` → `order`（`go mod edit -module` 已由 `--nomod` 处理，主要是 import 路径）
 2. 重命名 `configs/user_center.yaml` → `configs/order.yaml`，并同步 `cmd/*/main.go` 里的 `nacosConfigDataID` 与 `-conf` 默认值
 3. 在 `buf.yaml` / `buf.gen.config.yaml` 中登记新模块路径
+4. 改 `internal/data/ent/generate.go` 里的 `Package`（ent 生成代码的 import path），详见 [docs/ent.md](docs/ent.md)
 
-### 3. 本地运行（无需 Nacos）
+### 3. 起本地中间件
+
+存储层只接了 MySQL / PostgreSQL 驱动，本地开发用 `deploy/` 里的 compose 一键拉起：
+
+```bash
+make middleware-up     # MySQL :3306 + Redis :6379 + Nacos :8848/:9848
+make middleware-down   # 停掉（保留数据卷）
+```
+
+- 容器的端口、账号密码与 `configs/user_center.yaml` 的默认 DSN 完全对齐，起来即可用，不必再改配置。
+- compose 里的 `MYSQL_DATABASE: user_center` 会**建库**；ent 的 `auto_migrate` 只**建表**，不会建库。用自己的 MySQL 时先手动 `CREATE DATABASE`。
+- `redis` 目前是**预留**的：配置里有 `data.redis` 块，但还没有代码读它。只需要数据库的话，删掉 compose 里的 `redis` / `nacos` 两个 service 即可。
+- 端口被占用（本机已有 MySQL，或用 SSH 隧道转发了一台远端的）时 `up` 会报 `address already in use`：腾出端口，或只改映射的宿主侧（`"13306:3306"`）再用 `KRATOS_DB_SOURCE` 指过去。
+- 这份 compose 是**本地开发用**的，不是生产清单（无 TLS、无备份、无资源限制）。
+
+### 4. 本地运行（无需 Nacos）
 
 模板默认 `registry.address` 为空 —— Nacos 整链路关闭，开箱即跑：
 
 ```bash
-make run-user-center   # sqlite 自动建库建表，监听 :8000/:9000
+make run-user-center   # auto_migrate=true，启动时 ent 自动建表；监听 :8000/:9000
 
 # 冒烟
 curl -X POST localhost:8000/v1/auth/register -H 'Content-Type: application/json' \
   -d '{"username":"alice","password":"secret123","email":"alice@example.com"}'
 curl -X POST localhost:8000/v1/auth/login -H 'Content-Type: application/json' \
   -d '{"username":"alice","password":"secret123"}'
+
+open http://localhost:8000/swagger      # 内嵌 Swagger UI；spec 在 /openapi.yaml
 ```
 
-### 4. 完整模式（带注册中心 + 网关）
+### 5. 完整模式（带注册中心 + 网关）
 
 ```bash
-# Nacos（同时承担注册中心与配置中心）
-docker run -d --name nacos -p 8848:8848 -p 9848:9848 -e MODE=standalone nacos/nacos-server
+make middleware-up     # Nacos 同时承担注册中心与配置中心
 #   configs/*.yaml:
 #     registry: { address: 127.0.0.1:8848 }
 
@@ -142,6 +163,7 @@ curl localhost:8080/v1/users -H 'Origin: http://localhost:3000'   # 经网关 + 
 ```
 
 > `registry.address` 非空时，各服务同时拉取 Nacos 配置中心的同名 dataID（`<service>.yaml`）并热更新；留空时本地 yaml 即唯一配置来源。
+> Nacos 必须同时暴露 `8848`（HTTP）与 `9848`（gRPC）—— Go SDK 走 9848，只发布 8848 会让客户端一直卡住。
 
 ## Proto 管理与 buf 缓存
 
@@ -150,20 +172,21 @@ proto 依赖（`googleapis` 等）通过 [buf](https://buf.build) 管理，**没
 - `buf.yaml` 声明 workspace 模块（`api`、各服务 `internal/conf`）与 BSR 依赖
 - `buf.lock` 锁定依赖版本
 - 依赖的 proto 只会被拉取到**本地缓存目录**，构建时从缓存读取：
-  - Linux：`~/.cache/buf/v3`
-  - macOS：`~/.cache/buf/v3`
+  - Linux / macOS：`~/.cache/buf/v3`
   - 可用 `BUF_CACHE_DIR` 环境变量重定向；删除该目录即强制重新拉取
 
 ```bash
 make init          # 安装 buf 与 wire CLI
 buf dep update     # 按 buf.yaml 拉取/更新依赖（写入 buf.lock 与缓存）
 
-make api           # api/**.proto   → go / grpc / http / openapi.yaml
+make api           # api/**.proto → go / grpc / http 桩 + pkg/docs/specs/<domain>/openapi.yaml（每 domain 一份）
 make config        # 各服务 internal/conf → *.pb.go
 ```
 
-生成模板分三个文件：`buf.gen.yaml`（api 公共契约）、`buf.gen.config.yaml`（user_center 配置）、`buf.gen.gw.yaml`（gateway 配置）。
+生成模板分四个文件：`buf.gen.yaml`（api 公共契约：go/grpc/http 桩）、`buf.gen.openapi.yaml`（按 domain 各产出一份 OpenAPI）、`buf.gen.config.yaml`（user_center 配置）、`buf.gen.gw.yaml`（gateway 配置）。
 注意 gateway 的配置 proto 使用独立 package `kratos.gateway`，避免与各服务模板的 `kratos.api` 包在同一次编译中冲突。
+
+> `buf.gen.openapi.yaml` 里 OpenAPI 插件的 `opt` 值**不能含逗号** —— buf 会先按逗号拆分再传给插件，多出来的部分被当成未知 flag（`no such flag -message`）。
 
 ## 配置说明
 
@@ -173,7 +196,7 @@ make config        # 各服务 internal/conf → *.pb.go
 2. 当 `registry.address` 非空：Nacos 配置中心同名 dataID（`<service>.yaml`）合并覆盖，支持热更新
 3. `${VAR:default}` 占位符：kratos 默认 resolver 在合并后解析，从环境变量取值
 
-> **环境变量注入的正确姿势**：kratos 的 env source 只剥离 `KRATOS_` 前缀（及一个前导下划线），**不会**把键小写化、也**不会**把 `_` 映射成 `.`。因此 `KRATOS_AUTH_JWT_SECRET` 只会变成顶层键 `AUTH_JWT_SECRET`，无法直接覆盖嵌套的 `auth.jwt_secret`。要让某个值走环境变量，用占位符引用它 —— `jwt_secret: ${AUTH_JWT_SECRET:change-me-in-production}`，再设 `KRATOS_AUTH_JWT_SECRET=...`（前缀被剥离后正好命中占位符查找的键）。模板里的 `auth.jwt_secret` 就是这么做的。
+> **环境变量注入的正确姿势**：kratos 的 env source 只剥离 `KRATOS_` 前缀（及一个前导下划线），**不会**把键小写化、也**不会**把 `_` 映射成 `.`。因此 `KRATOS_AUTH_JWT_SECRET` 只会变成顶层键 `AUTH_JWT_SECRET`，无法直接覆盖嵌套的 `auth.jwt_secret`。要让某个值走环境变量，用占位符引用它 —— `jwt_secret: ${AUTH_JWT_SECRET:change-me-in-production}`，再设 `KRATOS_AUTH_JWT_SECRET=...`（前缀被剥离后正好命中占位符查找的键）。模板里的 `auth.jwt_secret` 与 `data.database.source` 就是这么做的。
 
 > Duration 一律使用 protojson 秒格式（如 `7200s`），不能写 `2h`。
 
@@ -181,15 +204,18 @@ make config        # 各服务 internal/conf → *.pb.go
 
 | 键 | 说明 |
 |---|---|
-| `data.database.orm` | `ent` 或 `gorm`，须与保留的 `internal/data` 子包一致 |
-| `data.database.driver` | `sqlite`（纯 Go、免 CGO，默认）、`mysql` 或 `postgres`（详见「数据库接入」） |
+| `data.database.driver` | `mysql`（默认）或 `postgres`，详见「数据库接入」 |
+| `data.database.source` | DSN，用 `${DB_SOURCE:...}` 占位符注入凭据；MySQL 别省 `parseTime=true&loc=Local` |
+| `data.database.debug` | 打印每条 SQL，仅开发环境开 |
+| `data.database.auto_migrate` | 启动时 `Schema.Create` 建表；**生产关掉**，改用版本化迁移（[docs/ent.md](docs/ent.md)） |
 | `auth.jwt_secret` / `*_ttl` | JWT 密钥（用 `${AUTH_JWT_SECRET:...}` 注入）与 access/refresh token 有效期 |
+| `snowflake.node_id` | 本实例的雪花节点号，集群内必须唯一（`[0,1023]`） |
 | `log.level` / `output` / `format` | 日志级别、输出目标（stdout/stderr/file）与编码（text/json）；引擎固定为标准库 log/slog |
 | `registry.address` | Nacos 服务器地址；留空则禁用注册/发现/远程配置（本地零依赖默认） |
 | `registry.namespace_id` / `group` | Nacos 命名空间与分组，留空即用 public / DEFAULT_GROUP |
 | `middleware.ratelimit` | 服务端限流：`enabled` / `type`(bbr\|token) / `qps` / `burst` |
 
-网关（`configs/gateway.yaml`）另有 `middleware.circuit_breaker`（每后端熔断），详见「限流与熔断」。
+网关（`configs/gateway.yaml`）另有 `gateway.routes`、`gateway.cors` 与 `middleware.circuit_breaker`（每后端熔断），详见「Gateway 网关」与「限流与熔断」。
 
 ## HTTP API 约定
 
@@ -231,18 +257,34 @@ HTTP 额外用 `http.RequestDecoder/ResponseEncoder/ErrorEncoder` 挂 protojson 
 
 ### 统一响应信封
 
-所有 HTTP 响应（成功与失败）都包成同一结构，**HTTP 状态码恒为 `200`**，业务结果看 `code`：
+所有 HTTP 响应（成功与失败）都包成同一结构 —— **只有三个字段**，**HTTP 状态码恒为 `200`**，业务结果看 `code`：
 
 ```json
-{ "code": 0, "message": "", "reason": "", "data": { }, "metadata": {} }
+{ "code": 0, "message": "", "data": { } }
 ```
 
 | 字段 | 成功 | 失败 |
 |---|---|---|
-| `code` | `0` | kratos/gRPC 状态码（`400`/`401`/`404`/`500`…） |
-| `reason` | 空 | API 错误枚举（`VALIDATOR`/`AUTH_UNAUTHORIZED`/`USER_NOT_FOUND`…） |
-| `message` | 空 | 错误描述 |
-| `data` | 资源对象 | `null` |
+| `code` | `0` | kratos/gRPC 状态码（`400`/`401`/`404`/`409`/`429`/`500`…） |
+| `message` | 空字符串 | 错误描述（人类可读，可直接展示给终端用户） |
+| `data` | 资源对象或列表包装 | `null` |
+
+失败示例（用户名已存在）：
+
+```json
+{ "code": 409, "message": "user already exists", "data": null }
+```
+
+三处手写 JSON 的地方保持同一形状，客户端只需一套解析逻辑：
+
+| 出处 | 场景 | HTTP 状态码 |
+|---|---|---|
+| `pkg/middleware/codec.go` | 服务内所有 proto handler 的成功 / 失败响应 | 恒为 `200`，结果看 `code` |
+| `pkg/middleware/ratelimit.go` | 网关边缘限流命中（filter 形态，未进 kratos 链） | 真实 `429` |
+| `app/gateway/internal/proxy/handler.go` | 网关自身错误：无健康实例 / 熔断开路 `503`、后端不可达 `502` | 真实状态码 |
+
+> **为什么只有三个字段**：kratos 原生的 `reason`（错误枚举字符串）与 `code` 高度重复，`metadata` 只在需要回传结构化细节时才有用 —— 而 protovalidate 的失败信息已经拼进 `message`。字段越少，前后端约定越不容易漂移。
+> 需要机器可读的错误分类时，`reason` 仍然保留在**服务端**：`biz` 层用 `errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "user not found")` 构造错误，`RequestLogger` 会把 reason 打进日志，gRPC 侧也照常透传；只是不再出现在 HTTP body 里。要恢复给前端，给 `Envelope` 加回一个字段即可。
 
 实现在 `pkg/middleware/codec.go`（`ResponseEncoder`/`ErrorEncoder`）。想恢复语义化 HTTP 状态码，改 `writeEnvelope` 里的 `WriteHeader` 一行即可。**gRPC 不套信封**，沿用原生 status code。
 
@@ -254,78 +296,164 @@ HTTP 额外用 `http.RequestDecoder/ResponseEncoder/ErrorEncoder` 挂 protojson 
 - 枚举用名字（`"USER_STATUS_ACTIVE"`），而非数字
 - 字段名 snake_case（`UseProtoNames`），与 `.proto`、`openapi.yaml` 对齐
 - int64 编码为字符串，避免 JS 精度丢失
+- 零值字段省略（`EmitUnpopulated: false`），响应更紧凑
 
-请求侧同样走 protojson（`pkg/middleware` 的 `RequestDecoder`），因此客户端可把响应里的字段原样回传（枚举名、RFC 3339 时间都能被解析）。
+请求侧同样走 protojson（`pkg/middleware` 的 `RequestDecoder`），因此客户端可把响应里的字段原样回传（枚举名、RFC 3339 时间都能被解析）；未知字段容忍（`DiscardUnknown`），新老版本客户端不会互相打挂。
 
 ### 参数校验（protovalidate）
 
-校验规则用 [protovalidate](https://buf.build/docs/protovalidate) 直接写在 `.proto` 上（`buf.validate` 注解），运行时由 `validate.Validator` 中间件执行 —— **无需代码生成**，HTTP 与 gRPC 共用同一套规则不会漂移：
+校验规则用 [protovalidate](https://buf.build/docs/protovalidate) 直接写在 `.proto` 上（`buf.validate` 注解），运行时由 `validate.Validator` 中间件执行 —— **无需代码生成**，改完 proto 跑 `make api` 就生效，HTTP 与 gRPC 共用同一套规则不会漂移。
+
+**规则写在哪**：字段的 `[(buf.validate.field) = {...}]` 注解。`api/user/v1/auth.proto` 的实际写法：
 
 ```proto
-string email = 2 [(buf.validate.field) = {
-  required: true,
-  string: {email: true, max_len: 255}
-}];
-string password = 3 [(buf.validate.field) = {
-  required: true,
-  string: {min_len: 8, max_len: 72}   // bcrypt 上限 72 字节
-}];
+message RegisterRequest {
+  string username = 1 [
+    (google.api.field_behavior) = REQUIRED,      // 进 OpenAPI 文档的 required 标记
+    (buf.validate.field) = {                     // 真正在运行时执行的规则
+      required: true
+      string: {min_len: 3, max_len: 64}
+    }
+  ];
+  string email = 2 [(buf.validate.field) = {
+    required: true
+    string: {email: true, max_len: 255}
+  }];
+  // 明文密码 8-72 字符：bcrypt 只吃前 72 字节，上限与之对齐
+  string password = 3 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 8, max_len: 72}
+  }];
+  // 可选字段只约束形状，不写 required
+  string nickname = 4 [(buf.validate.field).string = {max_len: 64}];
+}
 ```
 
-校验失败返回 `code=400, reason=VALIDATOR`。共享资源 `User` 的字段用 `ignore: IGNORE_IF_ZERO_VALUE`（而非 `required`），保证 `UpdateUser`（PATCH）局部更新时未传字段不触发规则；创建路径的非空由 `biz` 层兜底。
+`field_behavior` 与 `buf.validate` 是两件事：前者是**文档/契约**元数据（生成的 OpenAPI 会标 required），后者才是**运行时执行**的规则。只写 `field_behavior` 不会有任何校验效果。
+
+**谁来执行**：`pkg/middleware/validate.go` 的 `ProtoValidator` 调 `protovalidate.Validate(msg)`，被挂在中间件链**最内层**（紧贴 handler）：
+
+```go
+validate.Validator(pkgmw.ProtoValidator)
+```
+
+放在最内层的意义是：`recovery` 兜住校验器自身的 panic、`logging` 记下这次 400、`ratelimit` 先把洪峰削掉、`auth` 先确认调用者身份 —— 无效 token 的请求连校验都不会跑，返回 401 而不是 400。规则按消息类型编译一次并缓存，后续请求开销很小。
+
+**校验失败时客户端看到什么**：kratos 的 `validate.Validator` 把校验错误包成 `errors.BadRequest("VALIDATOR", err.Error())`，所以 HTTP 侧是 `code=400`，`message` 是 protovalidate 生成的**逐字段多行文本**：
+
+```bash
+curl -X POST localhost:8000/v1/auth/register -H 'Content-Type: application/json' \
+  -d '{"username":"a","password":"short","email":"not-an-email"}'
+```
+
+```json
+{
+  "code": 400,
+  "message": "validation errors:\n - username: must be at least 3 characters\n - email: must be a valid email address\n - password: must be at least 8 characters",
+  "data": null
+}
+```
+
+一次请求会**收集全部**违规字段（不是遇到第一个就返回），前端可以一次性标红所有输入框。`message` 含 `\n`，展示时按需 split 或直接原样渲染。gRPC 侧同一份规则返回 `InvalidArgument`，message 完全一致。
+
+**常用规则速查**：
+
+| 场景 | 写法 |
+|---|---|
+| 必填 | `required: true` |
+| 字符串长度 | `string: {min_len: 3, max_len: 32}` |
+| 邮箱 / URI / UUID | `string: {email: true}` / `{uri: true}` / `{uuid: true}` |
+| 枚举白名单 | `string: {in: ["a", "b"]}` |
+| 数值范围 | `int32: {gte: 0, lte: 100}` |
+| 正则 | `string: {pattern: "^[a-z]+$"}`（RE2，不支持反向引用） |
+| 时间戳 | `timestamp: {gte: {now: true}}` |
+| repeated | `repeated: {min_items: 1, max_items: 100, items: {string: {min_len: 1}}}` |
+| map | `map: {max_pairs: 10, values: {string: {max_len: 64}}}` |
+| 消息级（跨字段） | `option (buf.validate.message) = { ... }`，例如「start 必须早于 end」 |
+
+**PATCH 语义**：共享资源 `User` 的字段用 `ignore: IGNORE_IF_ZERO_VALUE` 而不是 `required`，这样 `UpdateUser` 局部更新时未传的零值字段不触发规则；创建路径的非空由 `biz` 层兜底（`ErrUserInvalidArgument`）。给新资源加规则时按 RPC 语义选：Create 用 `required`，共享消息用于 Update 时用 `ignore: IGNORE_IF_ZERO_VALUE`。
+
+**边界在哪**：protovalidate 只管**请求形状**（格式、长度、范围、必填）。跨请求 / 需要查库的规则（用户名是否已存在、旧密码是否正确、状态机是否允许这次流转）属于领域规则，留在 `biz` 层，用 `errors.Conflict` / `errors.BadRequest` + `error_reason.proto` 的枚举抛出；`service` 层只做 DTO ↔ DO 转换，不写业务判断。
+
+### API 文档（Swagger / OpenAPI）
+
+文档由 proto **生成**、由服务**自己托管**：`make api` 按 `api/<domain>` 各产出一份 spec 并 `go:embed` 进二进制；UI 用 Go 生态的事实标准 `swaggo/http-swagger`，它托管内嵌的官方 `swagger-ui-dist` 资源 —— **不走 CDN、离线可用**，也不用手写 swaggo 注解（文档仍从 proto 生成）：
+
+```
+api/<domain>/**.proto ──make api──► pkg/docs/specs/<domain>/openapi.yaml ──go:embed──► 二进制
+                                                                                        │
+                             GET /openapi.yaml ◄────────────────────────────────────────┤  (注入 securitySchemes + 重写 servers)
+                             GET /swagger/  (UI) ◄──────────────────────────────────────┘  (http-swagger + 内嵌静态资源)
+```
+
+- **`make api` 按 domain 产出 spec**：`buf.gen.openapi.yaml` 里的 `protoc-gen-openapi` 对每个 `api/<domain>` 目录各跑一次（`--path api/<domain>`），产出 `pkg/docs/specs/<domain>/openapi.yaml` —— **一个 domain 一份**，而非把整个 `api/` 合并成单份。改 proto → `make api` → 文档自动跟上，**不可能与代码脱节**。
+- **每服务只显示自己的接口**：服务在 `http.go` 里用 `docs.Register(srv, "<domain>")` 指名托管自己实现的那份 spec，所以 `user_center` 的 `/swagger` 只列 `api/user` 的 RPC。若把所有 domain 合并成一份，每个服务的 `/swagger` 都会列出别家的接口，"Try it out" 打到本服务没有的路由只会 404。
+- **spec 与线上报文严格一致**：生成参数用 `naming=proto` + `enum_type=string`，正好对齐运行时的 protojson（snake_case 字段、枚举按名、int64 为字符串）。用默认 `naming=json` 生成会得到 camelCase 的假文档 —— 这是个很容易踩的坑。
+- **一处已知局限**：`protoc-gen-openapi` 会把 `google.api.field_behavior = REQUIRED` 翻译成 schema 的 `required` 列表，但**不会**把 `buf.validate` 的约束（`min_len` / `email` / `pattern`…）翻译成 `minLength` / `format` / `pattern`。也就是说文档里能看到"哪些字段必填、是什么类型"，看不到"长度和格式的具体门槛"—— 那部分以 `.proto` 为准，实际请求也会被服务端按规则拒绝（见「参数校验」）。
+- **`go:embed` 内嵌**：`pkg/docs/docs.go` 把 yaml 编进二进制，运行时不依赖文件系统，镜像里不必再 COPY 一份 spec。UI 的 css/js 同样内嵌在二进制里（`swaggo/files` 打包了官方 `swagger-ui-dist`），整个 `/swagger` 自包含。
+- **一行挂载**：`internal/server/http.go` 里一行 `docs.Register(srv, "user")` 就注册了两个路由（`"user"` 是本服务实现的 `api/<domain>` 目录名）。不想要文档的服务删掉这一行即可。
+
+```bash
+make api && make run-user-center
+open http://localhost:8000/swagger       # 可交互 UI，直接 "Try it out"
+curl  http://localhost:8000/openapi.yaml # 原始 spec，导入 Postman / Apifox / Insomnia
+```
+
+几个实现细节值得知道：
+
+- **`servers` 会被动态重写**：proto 里的 `google.api.default_host` 会生成 `https://user.example.com` 这类占位 host，直接拿去 "try it out" 会打到不存在的域名。`handleSpec` 按当前请求的 origin（含 `X-Forwarded-Proto` / `X-Forwarded-Host`）重写 `servers`，所以经网关或 TLS 代理访问时也是对的。
+- **UI 静态资源内嵌、不走 CDN**：`swaggo/http-swagger` 直接托管 `swaggo/files` 里内嵌的官方 `swagger-ui-dist`（`swagger-ui.css` ≈145 KB、`swagger-ui-bundle.js` ≈1 MB），`/swagger` 完全离线可用、浏览器无需出网，UI 版本也随二进制锁定、可复现。代价是二进制增大约 8 MB（内嵌资源含 source map）—— 用体积换掉 CDN 依赖。
+- **受保护接口怎么调**：`protoc-gen-openapi` 不生成 `securitySchemes`，`pkg/docs` 在托管时往 spec 注入一份 `bearerAuth`（HTTP bearer / JWT），挂到 `components.securitySchemes` 与顶层 `security`。于是 UI 用的是 swagger 原生的 **Authorize** 按钮（开了 `persistAuthorization`，刷新/重开浏览器不丢），从 `POST /v1/auth/login` 拿到 `access_token` 填进去即可调需鉴权的 RPC；导入 Postman / Apifox 同样会提示要 token。注入是全局的，公开 RPC（Register/Login/RefreshToken）也会带锁标记，但不填 token 时请求根本不带 `Authorization` 头，而鉴权 selector 对本就不保护的路由会忽略该头，无副作用。
+- **`/swagger` 是裸 handler**：绕过 kratos 中间件链 —— 不套信封、不做鉴权、不计入限流。它是**开发/内网工具**，不要暴露到公网边缘。
+- **文档为什么在 `pkg/docs`（根模块）**：`go:embed` 不能跨模块边界，而 `api/` 属根模块、`app/user_center/` 是嵌套模块；所有 domain 的 spec 统一放在根模块的 `pkg/docs/specs/` 下（`embed.FS` 嵌入整棵目录树，新增 domain 无需改代码），由服务 import 后指名托管自己那份。
 
 ### 鉴权（JWT）
 
-鉴权中间件本体在 `pkg/middleware/auth.go`（`TokenVerifier` 接口 + `TokenAuth`：抽取 bearer、校验、把 `AuthClaims` 注入 `context`），令牌引擎在 `pkg/jwt`（HS256 签发/校验）。`internal/server/auth.go` 只保留**服务专属**部分：一个把 `biz.AuthUsecase` 适配成 `TokenVerifier` 的小结构，加一个 `selector` 做**选择性**鉴权 —— `UserService` 全部 + `AuthService` 的 `Logout`/`ChangePassword` 需要 `Authorization: Bearer <access_token>`；`Register`/`Login`/`RefreshToken` 放行。校验通过后下游用 `pkgmw.UserIDFromContext(ctx)` 取当前用户。未带 / 无效 token 返回 `code=401, reason=AUTH_UNAUTHORIZED`。新增受保护 RPC 时，在 `authMiddleware` 的 `selector` 里加 `Prefix`/`Path` 即可。
+鉴权中间件本体在 `pkg/middleware/auth.go`（`TokenVerifier` 接口 + `TokenAuth`：抽取 bearer、校验、把 `AuthClaims` 注入 `context`），令牌引擎在 `pkg/jwt`（HS256 签发/校验）。`internal/server/auth.go` 只保留**服务专属**部分：一个把 `biz.AuthUsecase` 适配成 `TokenVerifier` 的小结构，加一个 `selector` 做**选择性**鉴权 —— `UserService` 全部 + `AuthService` 的 `Logout`/`ChangePassword` 需要 `Authorization: Bearer <access_token>`；`Register`/`Login`/`RefreshToken` 放行。校验通过后下游用 `pkgmw.UserIDFromContext(ctx)` 取当前用户。未带 / 无效 token 返回 `code=401`（reason `AUTH_UNAUTHORIZED` 只进日志，不进 body）。新增受保护 RPC 时，在 `authMiddleware` 的 `selector` 里加 `Prefix`/`Path` 即可。
 
 ### 请求日志与链路追踪
 
 - `pkg/middleware/logging.go`（`RequestLogger`）：每请求记一行 `kind/operation/code/reason/latency`，**不打印请求体**（避免明文密码入日志）；出错时升为 Error 级并带 message。未使用 kratos 自带 `logging.Server()`，因其 `%+v` 会 dump 出密码。
 - `tracing.Server()`（contrib/otel）已挂载，日志自动携带 `trace_id`/`span_id`。**默认无 exporter（noop）**，接入时在 `main.go` 设置全局 `otel.SetTracerProvider(...)`（OTLP/Jaeger 等）即可生效，无需改动中间件。
 
-## 数据库接入（ent / gorm × sqlite / mysql / postgres）
+## 数据库接入（ent × mysql / postgres）
 
-存储层由两个正交维度决定：**ORM 引擎**（`data.database.orm`：`ent` 或 `gorm`）与 **SQL 驱动**（`data.database.driver`：`sqlite` / `mysql` / `postgres`）。两套 ORM 都支持这三种驱动，可自由组合。
+存储层只有一套实现：**ent**（`app/user_center/internal/data/ent/`）—— schema 用 Go 写，客户端、查询构造器、迁移描述全部生成，手写的只有 schema、repo 和 DO↔PO 转换。完整流程（建表 → 生成 → 接线 → 本地开发 → 生产版本化迁移）见 **[docs/ent.md](docs/ent.md)**，这里只讲配置。
 
 ### 驱动与 DSN
 
-| `driver` | 底层依赖（ent / gorm） | `source`（DSN）示例 | 备注 |
+| `driver` | 底层依赖 | `source`（DSN）示例 | 备注 |
 |---|---|---|---|
-| `sqlite` | `modernc.org/sqlite` / `glebarez/sqlite`（均纯 Go、免 CGO） | `user_center.db`（文件路径） | 默认，本地零依赖；ent 侧自动补 `foreign_keys` pragma |
-| `mysql` | `go-sql-driver/mysql` / `gorm.io/driver/mysql` | `user:pass@tcp(127.0.0.1:3306)/dbname?parseTime=true` | 生产常用 |
-| `postgres` | `jackc/pgx/v5/stdlib` / `gorm.io/driver/postgres` | `postgres://user:pass@127.0.0.1:5432/dbname?sslmode=disable` | 亦接受别名 `postgresql` |
+| `mysql` | `go-sql-driver/mysql` | `root:123456@tcp(127.0.0.1:3306)/user_center?parseTime=true&loc=Local` | **默认**，`deploy/` 的 compose 起的就是它 |
+| `postgres` | `jackc/pgx/v5/stdlib` | `postgres://postgres:123456@127.0.0.1:5432/user_center?sslmode=disable` | 亦接受别名 `postgresql` |
 
-> ent 把 `database/sql` 驱动名与 dialect 常量分开映射：pgx 注册名是 `pgx`、ent dialect 是 `postgres`；纯 Go sqlite 注册名是 `sqlite`、ent dialect 是 `sqlite3`。配置里统一填 `driver: postgres`（或 `mysql` / `sqlite`）即可，映射在 `internal/data/ent/data.go` 内部完成。
+> ent 把 `database/sql` 驱动名与 dialect 常量分开映射：配置填 `postgres`，实际 `sql.Open` 用 `pgx`。映射写在 `internal/data/ent/data.go` 的 `openClient` 里，填错驱动名会直接报 `unsupported ent driver`。
 
-以 postgres + gorm 为例，改 `configs/user_center.yaml`：
+> **没有 sqlite**：模板不再提供纯 Go 的 sqlite 驱动，本地开发统一用 `make middleware-up` 起 MySQL —— 少一个"本地能跑、生产不能跑"的方言差异（sqlite 没有真正的并发写、类型系统也宽松得多）。
+
+### 换到 PostgreSQL
+
+改 `configs/user_center.yaml` 的两行即可，代码不用动（pgx 驱动已经 import）：
 
 ```yaml
 data:
   database:
     driver: postgres
-    source: postgres://user:pass@127.0.0.1:5432/user_center?sslmode=disable
-    orm: gorm
-    debug: false          # true 时打印每条 SQL（仅开发）
-    auto_migrate: true    # 启动建表/改表；生产建议关闭，改用受控迁移
+    source: '${DB_SOURCE:postgres://postgres:123456@127.0.0.1:5432/user_center?sslmode=disable}'
 ```
 
-`debug` / `auto_migrate` 对两种 ORM 都生效：`auto_migrate` 是本地开发的便利（ent 走 `Schema.Create`、gorm 走 `AutoMigrate`），**生产应关闭**，把表结构变更作为独立、可评审的步骤。凭据不要写进版本库 —— 用 `${VAR:default}` 占位符或 Nacos 配置中心注入（见「配置说明」）。
+配置里已经以注释形式给出了这段，取消注释就能用。
 
-### 切换 ORM（ent ↔ gorm）
+### debug 与 auto_migrate
 
-两套实现是自包含子包，各带完整 `ProviderSet`。切换 = 删一个目录 + 改一行：
-
-```bash
-# ent → gorm
-rm -rf app/user_center/internal/data/ent
-# 编辑 app/user_center/internal/data/data.go：
-#   import ".../internal/data/gorm"
-#   var ProviderSet = wire.NewSet(gorm.ProviderSet)
-make wire           # 重新生成 wire_gen.go
-# 同步修改 configs/user_center.yaml 的 data.database.orm: gorm
+```yaml
+    debug: true        # 打印每条 SQL，只在开发环境开
+    auto_migrate: true # 启动时 ent Schema.Create；生产关掉
 ```
 
-反向同理。`biz` 层只依赖 `UserRepo` 接口，对切换无感知。
+`auto_migrate` 调的是 ent 的 `Schema.Create`：建缺失的表和列，但**默认不删**已废弃的列/索引、也不做有损的类型变更。它是本地开发的便利，**生产必须关掉** —— 应用启动时改表无法评审、无法灰度，多副本并发启动还会互相打架。生产用 Atlas 做版本化迁移，迁移 SQL 落在 `deploy/script/migrations/`，详见 [docs/ent.md 第 6 步](docs/ent.md)。
+
+凭据不要写进版本库 —— 用 `${DB_SOURCE:...}` 占位符（对应 `KRATOS_DB_SOURCE`）或 Nacos 配置中心注入，见「配置说明」。
 
 ## 服务注册、发现与配置中心（Nacos）
 
@@ -376,7 +504,7 @@ user.ID  = id.Int64()                       // 存入 BIGINT
 reply.Id = id.Int64()                       // DTO 字段声明为 int64，protojson 自动输出 JSON 字符串，JS 端不丢 2^53 精度
 ```
 
-> **user_center 已就地接入**：`pkg/idgen` 定义 `Generator` 接口 + 雪花实现，`internal/biz` 的 `NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent / gorm 主键均为**不自增**的 BIGINT。
+> **user_center 已就地接入**：`pkg/idgen` 定义 `Generator` 接口 + 雪花实现，`internal/biz` 的 `NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent 主键是**不自增**的 BIGINT（`IDMixin` 用 `entsql.Annotation{Incremental: &false}` 关掉自增，否则数据库会和应用抢着发号）。
 
 ### 节点号分配策略
 
@@ -393,7 +521,7 @@ reply.Id = id.Int64()                       // DTO 字段声明为 int64，proto
 
 ### JSON 精度
 
-ID 实现了 `encoding.TextMarshaler`，`json.Marshal` 会自动输出为十进制字符串。Proto 字段声明为 `string` 即可端到端保持精度。
+ID 实现了 `encoding.TextMarshaler`，`json.Marshal` 会自动输出为十进制字符串。Proto 字段声明为 `int64` 即可，protojson 同样输出字符串，端到端保持精度。
 
 ## Gateway 网关
 
@@ -405,7 +533,7 @@ ID 实现了 `encoding.TextMarshaler`，`json.Marshal` 会自动输出为十进�
 - **CORS**：`gateway.cors` 配置预检与跨域头；生产请显式列出 origins，勿用 `"*"` + `allow_credentials: true`
 - **边缘限流**：`middleware.ratelimit` 固定 token bucket，以 HTTP filter 形式挂在最内层（详见「限流与熔断」）
 - **每后端熔断**：`middleware.circuit_breaker` 基于 sony/gobreaker，每条路由一个独立熔断器，后端持续 5xx 即开路快速失败
-- **容错**：无健康实例返回 `503`；后端连接失败返回 `502`；熔断开路返回 `503`；限流命中返回 `429`，均为 JSON 错误体
+- **容错**：无健康实例返回 `503`；后端连接失败返回 `502`；熔断开路返回 `503`；限流命中返回 `429`。响应体与服务端信封同形（`{"code":…,"message":…,"data":null}`），但**保留真实 HTTP 状态码** —— 网关是代理，藏起状态码会让缓存、浏览器和重试逻辑失效
 
 新增后端只需在 `routes` 下加一条：
 
@@ -427,7 +555,7 @@ gateway:
 | 配置 | `middleware.ratelimit` | `middleware.ratelimit` |
 | 形态 | kratos `middleware.Middleware`（走生成的 proto handler 链） | HTTP `filter`（`khttp.Filter`） |
 | 算法 | `bbr`（kratos 自适应，默认）或 `token`（固定 qps/burst） | `token`（固定 qps/burst） |
-| 触发 | `code=429, reason=RATELIMIT`（套响应信封） | HTTP `429` + `{"code":429,...}` |
+| 触发 | HTTP `200` + `{"code":429,"message":"…","data":null}`（套信封） | HTTP `429` + `{"code":429,"message":"rate limit exceeded","data":null}` |
 
 **为什么形态不同**：kratos 的 `http.Middleware(...)` 链是在**生成的 proto 路由 handler 内部**通过 `ctx.Middleware(...)` 调用的；网关的反向代理路由用 `HandlePrefix` 注册的是**裸 handler**，从不调用它，因此**绕过了 kratos 中间件链**，只能用 `khttp.Filter` 包裹。这也是网关端只提供 token bucket 的原因 —— kratos 的 BBR 构造器在 internal 包、且 `ratelimit.Limiter` 接口无 request 上下文，无法作为独立 limiter 挂到 filter 上。
 
@@ -469,23 +597,42 @@ middleware:
 ```
 
 - **失败判定**：只有后端返回 `5xx` 记为失败；发现空档（无健康实例）返回 `503` 但**不计入失败**，避免注册抖动误开熔断。
-- **开路行为**：熔断器 open 时直接返回 `503`（`{"code":503,"message":"upstream circuit open"}`），不再压到病态后端；`timeout` 后转 half-open 放行 `max_requests` 个探测，成功即闭合。
+- **开路行为**：熔断器 open 时直接返回 `503`（`{"code":503,"message":"upstream circuit open","data":null}`），不再压到病态后端；`timeout` 后转 half-open 放行 `max_requests` 个探测，成功即闭合。
 - **隔离性**：一个后端熔断不影响其它路由 —— 每条 route 独立实例，配置共享。
 
 ## 新增资源标准流程
 
 以新增 `order` 资源为例（单服务内）：
 
-1. **DTO**：在 `api/<domain>/v1/` 定义 proto（`<resource>.proto` + 扩充 `error_reason.proto`），字段用 `buf.validate` 声明校验规则，`make api`
+1. **DTO**：在 `api/<domain>/v1/` 定义 proto（`<resource>.proto` + 扩充 `error_reason.proto`），字段用 `buf.validate` 声明校验规则，`make api`（顺带刷新 Swagger spec）
 2. **DO**：`internal/biz/order.go` 定义 DO、`OrderRepo` 接口、`OrderUsecase`，错误用 `errors.NotFound/BadRequest` + error reason 枚举
-3. **PO**：保留的 ORM 子包中实现 repo（ent：先写 `schema/order.go` 再 `make ent`；gorm：写 model + repo）
-4. **service**：`internal/service/order.go` 做 DTO ↔ DO 转换，在 `internal/server` 注册；若为受保护资源，在 `auth.go` 的 `authMiddleware` selector 里登记 `Prefix`
-5. **重新注入**：`make wire`
+3. **PO**：`internal/data/ent/schema/order.go` 写 schema → `make ent` → `internal/data/ent/order_repo.go` 实现 `biz.OrderRepo`（含 `toBiz` 转换与错误映射），详见 [docs/ent.md](docs/ent.md)
+4. **service**：`internal/service/order.go` 做 DTO ↔ DO 转换；在 `internal/server` 注册 HTTP/gRPC service；若为受保护资源，在 `auth.go` 的 `authMiddleware` selector 里登记 `Prefix`
+5. **重新注入**：`make wire`（或直接 `make generate` = `make ent` + `make wire`）
 6. **网关路由**（可选）：`configs/gateway.yaml` 加一条 route
 
 分层契约（import 方向、模型边界）详见 [AGENTS.md](AGENTS.md)。
 
-## Docker 部署
+## 部署
+
+### deploy/ 目录
+
+部署物料集中在 `deploy/`，不散落在仓库根：
+
+```
+deploy/
+  docker-compose.middleware.yaml   本地中间件：MySQL + Redis + Nacos（make middleware-up）
+  script/                          SQL 物料（当前为空占位）
+    migrations/                    Atlas 生成的增量迁移（*.sql + atlas.sum），随代码提交
+                                   —— 首次 `atlas migrate diff` 时创建
+    schema.sql                     可选：某版本的全量 DDL，用于新环境初始化或 DBA 评审
+```
+
+- **中间件**：`make middleware-up` / `make middleware-down`。这份 compose 面向本地开发，凭据、端口与 `configs/*.yaml` 的默认值对齐；生产环境请用自己的托管服务或改造后的清单。
+- **迁移 SQL**：由 Atlas 生成到 `deploy/script/migrations/`，在发布**之前**独立执行（`atlas migrate apply`）。`deploy/script/schema.sql` 可放全量 DDL 供新环境初始化或 DBA 评审。完整流程见 [docs/ent.md](docs/ent.md)。
+- 需要业务服务的 compose / k8s 清单时，也放进 `deploy/`（例如 `deploy/docker-compose.app.yaml`），保持"部署相关的东西都在一处"。
+
+### 服务镜像
 
 `Dockerfile` 参数化构建任意服务：
 
@@ -505,16 +652,33 @@ docker run -p 8080:8080 \
   gateway -conf /data/configs/gateway.yaml
 ```
 
-sqlite 驱动纯 Go 实现，镜像保持 `CGO_ENABLED=0` 静态构建。
+镜像保持 `CGO_ENABLED=0` 静态构建（MySQL / PostgreSQL 驱动都是纯 Go）。OpenAPI spec 已 `go:embed` 进二进制，容器里不需要额外 COPY 文档文件。
 
 ## Make 速查
+
+`make`（或 `make help`）会列出全部目标及其说明：
 
 | 命令 | 作用 |
 |---|---|
 | `make init` | 安装 buf、wire CLI |
-| `make api` / `make config` | 生成 api / 各服务配置代码 |
-| `make ent` | 重新生成 ent ORM 代码（改 schema 后） |
-| `make wire` | 重新生成依赖注入代码 |
-| `make build` / `make test` | 构建到 bin/ / 全量测试 |
-| `make run-user-center` / `make run-gateway` | 本地运行 |
-| `make generate` / `make all` | ORM+DI 重生成 / 全部代码生成 |
+| `make api` | `api/**.proto` → Go/gRPC/HTTP 桩 + `pkg/docs/specs/<domain>/openapi.yaml`（每 domain 一份） |
+| `make config` | 各服务 `internal/conf/*.proto` → `*.pb.go` |
+| `make ent` | 改 ent schema 后重新生成 ORM 代码 |
+| `make wire` | 改 ProviderSet / 构造函数签名后重新生成 `wire_gen.go` |
+| `make generate` | `ent` + `wire`（改完 biz/data 的常规收尾） |
+| `make all` | `api` + `config` + `generate`（全量重生成） |
+| `make build` | 编译两个模块的二进制到 `bin/` |
+| `make test` | 跑两个模块的全部测试 |
+| `make middleware-up` / `middleware-down` | 起 / 停本地中间件（`deploy/docker-compose.middleware.yaml`） |
+| `make run-user-center` / `make run-gateway` | 本地运行服务 / 网关 |
+| `make tidy` | 在不破坏 workspace 的前提下清理 `go.mod` / `go.sum` |
+
+> 生成的文件（`*.pb.go`、`*_grpc.pb.go`、`*_http.pb.go`、`wire_gen.go`、ent 生成代码、`specs/<domain>/openapi.yaml`）**都提交进仓库**，所以源文件改动与重生成结果属于同一个 commit；永远不要手改生成文件。
+
+## 文档索引
+
+| 文档 | 内容 |
+|---|---|
+| [AGENTS.md](AGENTS.md) | 分层契约：service/biz/data 谁能 import 谁、DTO/DO/PO 边界、新增资源清单 |
+| [docs/ent.md](docs/ent.md) | ent 全流程：写 schema → 生成 → repo → 接线 → 本地开发 → 生产版本化迁移 |
+| `http://localhost:8000/swagger` | 运行时的可交互 API 文档 |

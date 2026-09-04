@@ -3,8 +3,9 @@
 
 openapi: 3.0.3
 info:
-    title: ""
-    version: 0.0.1
+    title: Kratos Micro Layout API
+    description: HTTP API generated from api/**.proto. Bodies are protojson and every reply is wrapped in a code/message/data envelope.
+    version: 1.0.0
 servers:
     - url: https://user.example.com
 paths:
@@ -110,13 +111,13 @@ paths:
             description: ListUsers lists user accounts with filtering, ordering, and pagination.
             operationId: UserService_ListUsers
             parameters:
-                - name: pageSize
+                - name: page_size
                   in: query
                   description: Maximum number of users to return. Default 20, max 100.
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   description: Opaque pagination cursor returned by a previous call.
                   schema:
@@ -126,7 +127,7 @@ paths:
                   description: AIP-160 filter expression, e.g. `username = "alice"`.
                   schema:
                     type: string
-                - name: orderBy
+                - name: order_by
                   in: query
                   description: AIP-132 order_by expression, e.g. `created_at desc`.
                   schema:
@@ -215,7 +216,7 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: updateMask
+                - name: update_mask
                   in: query
                   description: Field mask specifying which fields to update.
                   schema:
@@ -242,14 +243,14 @@ components:
             description: ChangePasswordReply is the response for ChangePassword.
         api.user.v1.ChangePasswordRequest:
             required:
-                - oldPassword
-                - newPassword
+                - old_password
+                - new_password
             type: object
             properties:
-                oldPassword:
+                old_password:
                     type: string
                     description: Current password for verification.
-                newPassword:
+                new_password:
                     type: string
                     description: New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
             description: ChangePasswordRequest is the request for ChangePassword.
@@ -264,10 +265,10 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.user.v1.User'
-                nextPageToken:
+                next_page_token:
                     type: string
                     description: Token to retrieve the next page. Empty when there are no more results.
-                totalCount:
+                total_count:
                     type: string
                     description: Total count of matching users (for display only, not for pagination).
             description: ListUsersReply is the response message for ListUsers.
@@ -276,7 +277,7 @@ components:
             properties:
                 tokens:
                     $ref: '#/components/schemas/api.user.v1.TokenPair'
-                userId:
+                user_id:
                     type: string
                     description: User ID (snowflake int64; JSON string via protojson).
                 username:
@@ -303,7 +304,7 @@ components:
         api.user.v1.LogoutRequest:
             type: object
             properties:
-                accessToken:
+                access_token:
                     type: string
                     description: |-
                         The access token to invalidate. Optional: when omitted, the token is taken
@@ -317,17 +318,17 @@ components:
             description: RefreshTokenReply is the response for RefreshToken.
         api.user.v1.RefreshTokenRequest:
             required:
-                - refreshToken
+                - refresh_token
             type: object
             properties:
-                refreshToken:
+                refresh_token:
                     type: string
                     description: A valid refresh token.
             description: RefreshTokenRequest is the request for RefreshToken.
         api.user.v1.RegisterReply:
             type: object
             properties:
-                userId:
+                user_id:
                     type: string
                     description: ID of the newly created user (snowflake int64; JSON string via protojson).
                 username:
@@ -363,16 +364,16 @@ components:
         api.user.v1.TokenPair:
             type: object
             properties:
-                accessToken:
+                access_token:
                     type: string
                     description: Short-lived access token (JWT, default 2h).
-                refreshToken:
+                refresh_token:
                     type: string
                     description: Long-lived refresh token (JWT, default 7d).
-                expiresIn:
+                expires_in:
                     type: string
                     description: Access token TTL in seconds.
-                tokenType:
+                token_type:
                     type: string
                     description: Token type. Always "Bearer".
             description: TokenPair is a pair of access and refresh tokens.
@@ -408,14 +409,19 @@ components:
                     type: string
                     description: Avatar URL.
                 status:
-                    type: integer
+                    enum:
+                        - USER_STATUS_UNSPECIFIED
+                        - USER_STATUS_ACTIVE
+                        - USER_STATUS_DISABLED
+                        - USER_STATUS_DELETED
+                    type: string
                     description: Lifecycle status. Server-assigned; reads filter out deleted accounts.
                     format: enum
-                createdAt:
+                created_at:
                     type: string
                     description: Server-assigned creation timestamp.
                     format: date-time
-                updatedAt:
+                updated_at:
                     type: string
                     description: Server-assigned last-update timestamp.
                     format: date-time

@@ -1,86 +1,99 @@
-GOHOSTOS:=$(shell go env GOHOSTOS)
-GOPATH:=$(shell go env GOPATH)
-VERSION=$(shell git describe --tags --always)
+# kratos-micro-layout — build & code generation.
+#
+# `make` alone prints the target list. A target's help text is the `## `
+# comment on its own line; extra prose goes in plain `# ` comments.
+#
+# Three generators feed the tree, and `make all` runs all of them:
+#
+#   buf   api/**.proto             -> *.pb.go / *_grpc.pb.go / *_http.pb.go
+#                                     + pkg/docs/specs/<domain>/openapi.yaml (one per domain)
+#   buf   app/*/internal/conf      -> config *.pb.go
+#   ent   internal/data/ent/schema -> the ORM (client, queries, migrations)
+#   wire  cmd/user_center          -> wire_gen.go (dependency injection)
+#
+# Never hand-edit a generated file; edit its source and re-run the target.
+# Generated files are committed, so a source change and its regeneration
+# belong in the same commit.
 
-.PHONY: init
-# init env
-init:
+VERSION := $(shell git describe --tags --always)
+
+.PHONY: init api config ent wire generate all build test run-user-center \
+	run-gateway middleware-up middleware-down tidy help
+
+init: ## install the codegen CLIs (buf for protos, wire for dependency injection)
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/bufbuild/buf/cmd/buf@latest
 
-.PHONY: api
-# generate api proto (api/** -> go, grpc, http, openapi)
-api:
+api: ## regenerate the public API: protos -> Go/gRPC/HTTP stubs + one OpenAPI spec per api/<domain>
 	buf generate --template buf.gen.yaml
+	@set -e; \
+	rm -rf .oapi; \
+	for p in $$(find api -mindepth 1 -maxdepth 1 -type d | sort); do \
+		name=$$(basename $$p); \
+		echo "  openapi -> pkg/docs/specs/$$name/openapi.yaml"; \
+		buf generate --template buf.gen.openapi.yaml --path api/$$name; \
+		mkdir -p pkg/docs/specs/$$name; \
+		mv .oapi/openapi.yaml pkg/docs/specs/$$name/openapi.yaml; \
+	done; \
+	rm -rf .oapi
 
-.PHONY: config
-# generate internal config protos (app/*/internal/conf -> *.pb.go)
-config:
+# The gateway's config proto sits in its own package (kratos.gateway), so it is
+# generated through a second template instead of the shared one.
+config: ## regenerate service config types: app/*/internal/conf/*.proto -> *.pb.go
 	buf generate --template buf.gen.config.yaml
 	buf generate --template buf.gen.gw.yaml --path app/gateway/internal/conf/gateway.proto
 
-.PHONY: ent
-# regenerate ent ORM code after editing internal/data/ent/schema
-ent:
+ent: ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
 	cd app/user_center/internal/data/ent && go run generate.go
 
-.PHONY: wire
-# regenerate dependency-injection code
-wire:
+wire: ## regenerate wire_gen.go after changing a ProviderSet or constructor signature
 	cd app/user_center/cmd/user_center && wire
 
-.PHONY: build
-# build all commands into bin/ (root module + the app/user_center nested module)
-build:
+generate: ent wire ## regenerate ORM + DI code (the usual follow-up to a biz/data change)
+
+all: api config generate ## regenerate everything: protos, configs, ORM and DI
+
+# The nested app/user_center module is invisible to the root module's bare ./...,
+# so build and test list it explicitly.
+build: ## compile both binaries into bin/
 	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
 
-.PHONY: run-user-center
-# run the user_center service locally (reads configs/user_center.yaml)
-run-user-center:
-	go run ./app/user_center/cmd/user_center
-
-.PHONY: run-gateway
-# run the gateway locally (reads configs/gateway.yaml; needs Nacos)
-run-gateway:
-	go run ./app/gateway/cmd/gateway
-
-.PHONY: test
-# run all tests (root module + the app/user_center nested module)
-test:
+test: ## run every test in both modules
 	go test ./... ./app/user_center/...
 
-.PHONY: generate
-# regenerate ORM and DI code.
-# NOTE: no bare `go mod tidy` here. app/user_center is a nested module with a
-# minimal go.mod that borrows every dependency from the root go.mod through
-# go.work; tidying the root would prune the deps only app/user_center uses.
-# Add a new dependency with `go get <mod>` at the repo root instead.
-generate:
-	cd app/user_center/internal/data/ent && go run generate.go
-	cd app/user_center/cmd/user_center && wire
+run-user-center: ## run user_center locally (configs/user_center.yaml; needs MySQL)
+	go run ./app/user_center/cmd/user_center
 
-.PHONY: all
-# generate all code
-all:
-	make api
-	make config
-	make generate
+run-gateway: ## run the gateway locally (configs/gateway.yaml; needs Nacos)
+	go run ./app/gateway/cmd/gateway
 
-# show help
-help:
+middleware-up: ## start the local middleware stack (MySQL + Redis + Nacos) from deploy/
+	docker compose -f deploy/docker-compose.middleware.yaml up -d
+
+middleware-down: ## stop it again (pass -v by hand to also drop the data volumes)
+	docker compose -f deploy/docker-compose.middleware.yaml down
+
+# app/user_center borrows every dependency from the root go.mod through go.work,
+# so a bare `go mod tidy` here would delete the deps only that module uses (ent,
+# pgx, mysql, aip...). This target hides go.work and the nested go.mod for the
+# duration of the tidy — turning the tree back into a single module — then
+# restores both, even if the tidy fails.
+tidy: ## prune go.mod/go.sum without breaking the workspace
+	@set -e; \
+	restore() { \
+		[ -f .go.work.bak ] && mv .go.work.bak go.work; \
+		[ -f app/user_center/.go.mod.bak ] && mv app/user_center/.go.mod.bak app/user_center/go.mod; \
+	}; \
+	trap restore EXIT; \
+	mv go.work .go.work.bak; \
+	mv app/user_center/go.mod app/user_center/.go.mod.bak; \
+	go mod tidy
+
+help: ## print this target list
 	@echo ''
-	@echo 'Usage:'
-	@echo ' make [target]'
+	@echo 'Usage: make [target]'
 	@echo ''
-	@echo 'Targets:'
-	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
-	helpMessage = match(lastLine, /^# (.*)/); \
-		if (helpMessage) { \
-			helpCommand = substr($$1, 0, index($$1, ":")); \
-			helpMessage = substr(lastLine, RSTART + 2, RLENGTH); \
-			printf "\033[36m%-22s\033[0m %s\n", helpCommand,helpMessage; \
-		} \
-	} \
-	{ lastLine = $$0 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN { FS = ":.*?## " } \
+		/^[a-zA-Z_-]+:.*?## / { printf "\033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .DEFAULT_GOAL := help

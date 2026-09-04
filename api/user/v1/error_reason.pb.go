@@ -22,6 +22,11 @@ const (
 )
 
 // ErrorReason enumerates all user-domain error codes.
+//
+// The values double as the kratos error `reason` string (see internal/biz),
+// so they stay short and unprefixed: "USER_NOT_FOUND", not
+// "ERROR_REASON_USER_NOT_FOUND". Renaming a value here is a breaking API change
+// and requires `make api` plus an update of every biz call site.
 type ErrorReason int32
 
 const (

@@ -221,12 +221,15 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// writeJSON answers with a small JSON body, matching the shape the gateway's
-// edge errors use so clients parse one format regardless of the failure.
+// writeJSON answers with the unified code/message/data envelope so clients
+// parse one shape whether the failure came from the gateway edge or from a
+// backend. Unlike the service-side encoder the gateway keeps the real HTTP
+// status (429/502/503): it is a proxy, and hiding the status would break
+// caches, browsers and retry logic that never look at the body.
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, _ = fmt.Fprintf(w, `{"code":%d,"message":%q}`, status, message)
+	_, _ = fmt.Fprintf(w, `{"code":%d,"message":%q,"data":null}`, status, message)
 }
 
 // statusWriter records the response status and write errors so proxy access

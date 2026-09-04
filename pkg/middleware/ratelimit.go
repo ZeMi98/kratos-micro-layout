@@ -128,5 +128,5 @@ func (t *tokenBucket) Allow() (ratelimit.DoneFunc, error) {
 func writeTooManyRequests(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)
-	_, _ = io.WriteString(w, `{"code":429,"message":"rate limit exceeded"}`)
+	_, _ = io.WriteString(w, `{"code":429,"message":"rate limit exceeded","data":null}`)
 }

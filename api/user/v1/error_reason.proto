@@ -7,28 +7,33 @@ option java_multiple_files = true;
 option java_package = "api.user.v1";
 
 // ErrorReason enumerates all user-domain error codes.
+//
+// The values double as the kratos error `reason` string (see internal/biz),
+// so they stay short and unprefixed: "USER_NOT_FOUND", not
+// "ERROR_REASON_USER_NOT_FOUND". Renaming a value here is a breaking API change
+// and requires `make api` plus an update of every biz call site.
 enum ErrorReason {
   // Default unspecified error.
   ERROR_REASON_UNSPECIFIED = 0;
 
   // The requested user was not found.
-  ERROR_REASON_USER_NOT_FOUND = 1;
+  USER_NOT_FOUND = 1;
 
   // A user with the same username or email already exists.
-  ERROR_REASON_USER_ALREADY_EXISTS = 2;
+  USER_ALREADY_EXISTS = 2;
 
   // The request contains invalid arguments.
-  ERROR_REASON_USER_INVALID_ARGUMENT = 3;
+  USER_INVALID_ARGUMENT = 3;
 
   // The supplied credentials are invalid.
-  ERROR_REASON_AUTH_INVALID_CREDENTIALS = 4;
+  AUTH_INVALID_CREDENTIALS = 4;
 
   // The access or refresh token has expired.
-  ERROR_REASON_AUTH_TOKEN_EXPIRED = 5;
+  AUTH_TOKEN_EXPIRED = 5;
 
   // The token is malformed or tampered with.
-  ERROR_REASON_AUTH_TOKEN_INVALID = 6;
+  AUTH_TOKEN_INVALID = 6;
 
   // The request is not authenticated.
-  ERROR_REASON_AUTH_UNAUTHORIZED = 7;
+  AUTH_UNAUTHORIZED = 7;
 }

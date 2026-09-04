@@ -4,11 +4,15 @@
 #   docker build --build-arg SERVICE=app/gateway/cmd/gateway -t gateway .
 #   docker run -p 8000:8000 -v $(pwd)/configs:/data/configs user_center -conf /data/configs/user_center.yaml
 #
-# The pure-Go sqlite driver keeps CGO_ENABLED=0 viable; switch to a CGO build
-# only if you adopt a driver that needs it.
+# Both supported SQL drivers (go-sql-driver/mysql, jackc/pgx) are pure Go, so
+# the static CGO_ENABLED=0 build stays viable. go.work is copied along with the
+# source: the nested app/user_center module resolves api/ and pkg/ through it,
+# and every third-party dependency is declared in the root go.mod.
 ARG SERVICE=app/user_center/cmd/user_center
 
-FROM golang:1.25 AS builder
+# Keep this >= the `go` directive in go.mod: an older builder refuses the module
+# rather than downloading a newer toolchain.
+FROM golang:1.26 AS builder
 ARG SERVICE
 WORKDIR /src
 # Cache module downloads between image builds.

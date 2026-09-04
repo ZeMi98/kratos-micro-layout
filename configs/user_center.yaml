@@ -23,11 +23,24 @@ server:
 
 data:
   database:
-    driver: sqlite        # "sqlite" (pure-Go, no CGO), "mysql", or "postgres"
-    source: user_center.db # sqlite file path, mysql DSN, or postgres URL
-    orm: ent              # "ent" or "gorm" — must match the kept internal/data subpackage
-    debug: true
-    auto_migrate: true
+    # ent is the storage engine (app/user_center/internal/data/ent). Two
+    # drivers are wired up: "mysql" (default) and "postgres" — switching is a
+    # two-line change, see the commented block below.
+    driver: mysql
+    # MySQL DSN. The default points at the local container started by
+    #   docker compose -f deploy/docker-compose.middleware.yaml up -d
+    # Override the whole DSN with KRATOS_DB_SOURCE (see the header note on
+    # placeholders); never commit production credentials here.
+    #   parseTime=true  DATETIME <-> time.Time instead of []byte
+    #   loc=Local       keep timestamps in the app's zone, don't shift to UTC
+    source: '${DB_SOURCE:root:123456@tcp(127.0.0.1:3306)/user_center?parseTime=true&loc=Local}'
+    debug: true        # log every statement; development only
+    auto_migrate: true # ent Schema.Create on boot; false in production, see docs/ent.md
+    #
+    # PostgreSQL instead — change these two lines and nothing else (the pgx
+    # driver is already imported by internal/data/ent/data.go):
+    #   driver: postgres
+    #   source: '${DB_SOURCE:postgres://postgres:123456@127.0.0.1:5432/user_center?sslmode=disable}'
   redis:
     addr: 127.0.0.1:6379
 

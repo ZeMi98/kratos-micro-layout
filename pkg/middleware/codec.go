@@ -15,18 +15,20 @@ import (
 // Envelope is the unified HTTP response wrapper. Every JSON reply — success or
 // failure — shares this shape so clients parse a single structure:
 //
-//	{"code":0,"message":"","reason":"","data":{...},"metadata":{}}
+//	{"code":0,"message":"","data":{...}}
 //
-// Code is 0 on success and the kratos/gRPC status code on failure; Reason
-// carries the API error enum (empty on success); Data holds the resource on
-// success and null on failure. This is the HTTP-only convention: gRPC keeps its
-// native status codes and is not enveloped.
+// Code is 0 on success and the kratos/gRPC status code on failure (400, 401,
+// 404, 409, 429, 500 …); Message is empty on success and the error text on
+// failure; Data holds the resource on success and null on failure. Keeping the
+// envelope to exactly these three fields means a client branches on one number
+// and shows one string — the kratos error reason and metadata are deliberately
+// not surfaced (they remain available server-side in the logs and on gRPC).
+// This is the HTTP-only convention: gRPC keeps its native status codes and is
+// not enveloped.
 type Envelope struct {
-	Code     int32             `json:"code"`
-	Message  string            `json:"message"`
-	Reason   string            `json:"reason,omitempty"`
-	Data     json.RawMessage   `json:"data"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Code    int32           `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
 }
 
 // nullData is the literal JSON null embedded under "data" when there is no
@@ -118,17 +120,16 @@ func unmarshalData(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
 
-// ErrorEncoder renders a handler error into the unified envelope. The kratos
-// error is decomposed into code/reason/message/metadata so the body carries the
-// same information the default encoder would, just wrapped. Pass it to
-// http.ErrorEncoder when constructing a kratos HTTP server.
+// ErrorEncoder renders a handler error into the unified envelope: code is the
+// kratos/gRPC status code and message the error text. The kratos error reason
+// and metadata are dropped here — they are still logged by RequestLogger and
+// still travel on the gRPC transport. Pass it to http.ErrorEncoder when
+// constructing a kratos HTTP server.
 func ErrorEncoder(w http.ResponseWriter, _ *http.Request, err error) {
 	e := Envelope{Data: nullData}
 	if se := errors.FromError(err); se != nil {
 		e.Code = se.Code
 		e.Message = se.Message
-		e.Reason = se.Reason
-		e.Metadata = se.Metadata
 	} else {
 		e.Code = int32(http.StatusInternalServerError)
 		e.Message = err.Error()
