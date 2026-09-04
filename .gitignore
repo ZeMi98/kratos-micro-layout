@@ -32,6 +32,8 @@ Thumbs.db
 *.cert
 *.key
 *.log
+# filled-in middleware env (deploy/middleware/.env.example is the committed template)
+deploy/middleware/.env
 # stray local database files left behind by a smoke test
 *.db
 # staging dir for per-domain OpenAPI generation (`make api` moves these into pkg/docs/specs/)

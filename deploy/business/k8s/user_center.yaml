@@ -1,0 +1,144 @@
+# Example Kubernetes manifest for ONE business service (user_center).
+#
+# This is a TEMPLATE: adapt names, image registry/tag, replicas, resources and the
+# config wiring to your cluster, then copy it per service (gateway, your own
+# services). It assumes the middleware (MySQL / Redis / Nacos) is reachable from
+# the cluster — either managed services or the deploy/middleware stack exposed
+# in-cluster.
+#
+#   kubectl apply -f deploy/business/k8s/user_center.yaml
+#
+# Config strategy mirrors the app: the DSN and JWT secret use ${VAR:default}
+# placeholders in configs/*.yaml, so they are injected as env vars below. But
+# `registry.address` is a NESTED key kratos cannot override from env — set it in
+# the mounted ConfigMap (point it at your in-cluster Nacos, e.g. nacos:8848).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-center-config
+  labels:
+    app: user_center
+data:
+  # Copy of configs/user_center.yaml with cluster-appropriate values. At minimum
+  # set registry.address to your Nacos Service DNS (or leave empty to run
+  # standalone). Keep secrets OUT of here — they go in the Secret below.
+  user_center.yaml: |
+    server:
+      http:
+        addr: 0.0.0.0:8000
+        timeout: 1s
+      grpc:
+        addr: 0.0.0.0:9000
+        timeout: 1s
+    data:
+      database:
+        driver: mysql
+        source: '${DB_SOURCE}'
+        auto_migrate: false   # run reviewed Atlas migrations instead (docs/ent.md)
+      redis:
+        addr: redis:6379
+    auth:
+      jwt_secret: ${AUTH_JWT_SECRET}
+      access_token_ttl: 7200s
+      refresh_token_ttl: 604800s
+    snowflake:
+      node_id: 0              # MUST be unique per replica in [0,1023] — see note below
+    log:
+      level: info
+      output: stdout
+      format: json
+    registry:
+      address: nacos:8848     # nested key: set here, not via env
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-center-secret
+  labels:
+    app: user_center
+type: Opaque
+stringData:
+  # Create with: kubectl create secret generic user-center-secret \
+  #   --from-literal=DB_SOURCE='user:pass@tcp(mysql:3306)/user_center?parseTime=true&loc=Local' \
+  #   --from-literal=AUTH_JWT_SECRET='<openssl rand -hex 32>'
+  # This file only documents the keys; do NOT commit real values.
+  DB_SOURCE: "CHANGE_ME"
+  AUTH_JWT_SECRET: "CHANGE_ME"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-center
+  labels:
+    app: user_center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user_center
+  template:
+    metadata:
+      labels:
+        app: user_center
+    spec:
+      containers:
+        - name: user-center
+          # Build with the repo Dockerfile (SERVICE=app/user_center/cmd/user_center)
+          # and push to your registry, e.g.:
+          #   docker build --build-arg SERVICE=app/user_center/cmd/user_center \
+          #     -t <registry>/user_center:<tag> .
+          image: kratos/user_center:local
+          imagePullPolicy: IfNotPresent
+          args: ["-conf", "/data/configs/user_center.yaml"]
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: grpc
+              containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: user-center-secret
+          volumeMounts:
+            - name: config
+              mountPath: /data/configs
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /swagger/index.html
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: user-center-config
+# NOTE on scaling: biz mints int64 snowflake IDs, so EVERY replica needs a distinct
+# snowflake.node_id in [0,1023]. A single Deployment shares one ConfigMap, so either
+# inject node_id per pod (Downward API / init script / StatefulSet ordinal) or read it
+# from the config center before setting replicas > 1.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-center
+  labels:
+    app: user_center
+spec:
+  type: ClusterIP
+  selector:
+    app: user_center
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+    - name: grpc
+      port: 9000
+      targetPort: grpc

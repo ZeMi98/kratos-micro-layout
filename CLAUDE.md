@@ -29,9 +29,22 @@ pkg/idgen/                   ID seam: Generator interface + snowflake-backed imp
 pkg/nacos/                   Nacos registrar/discovery and config-source wrappers.
 pkg/snowflake/               Twitter Snowflake distributed ID generator (64-bit).
 configs/<service>.yaml       Runtime config, one file per service. No secrets.
-deploy/                      Deployment material: middleware docker-compose; SQL under deploy/script/.
+deploy/                      Deployment material: middleware/ (compose + .env.example), business/ (app compose/k8s templates), script/ (SQL).
 docs/                        Long-form guides. `docs/ent.md` owns the storage layer end to end.
 ```
+
+`app/user_center/` is three things at once: a working example service, a **git
+submodule** (the standalone service-template repo `kratos-micro-sub-service-layout`),
+and a **nested Go module** joined to the root through the committed `go.work`.
+A plain `git clone` — and `kratos new` — does NOT populate a submodule, so an
+uninitialized `app/user_center/` (empty dir) breaks EVERY `go` command through
+`go.work`. Run `make init` (or `git submodule update --init --recursive`) first;
+the Makefile's go targets (`build`/`test`/`run-*`/`ent`/`wire`) carry a
+`submodule-guard` that fails with a clear message otherwise. Because it is a
+nested module, the root's bare `./...` skips it — `make build`/`test` list
+`./app/user_center/...` explicitly, deps are added only at the root (`go get`),
+and pruning uses `make tidy` (never a bare `go mod tidy`, which would strip the
+deps only that module uses).
 
 ## Layering & dependency rules
 
@@ -266,14 +279,18 @@ them. `make help` lists every target with its one-line description.
 ## Running locally & deploy
 
 - `make middleware-up` starts MySQL, Redis and Nacos from
-  `deploy/docker-compose.middleware.yaml`; its ports and credentials match
-  the defaults in `configs/*.yaml`, so a service runs against it unchanged.
-  `make middleware-down` stops it (add `-v` by hand to drop the volumes).
-- Deployment material lives under `deploy/`: the middleware compose today,
-  and SQL under `deploy/script/` — Atlas versioned migrations in
-  `deploy/script/migrations/`, an optional full DDL dump in
-  `deploy/script/schema.sql`. Add app compose/k8s manifests there too
-  rather than at the repo root.
+  `deploy/middleware/docker-compose.middleware.yaml`; its ports and credentials
+  are `${VAR:-default}` placeholders whose defaults match `configs/*.yaml`, so a
+  service runs against it unchanged (copy `.env.example` to `.env` to override;
+  `.env` is git-ignored). `make middleware-down` stops it (add `-v` by hand to
+  drop the volumes). Elasticsearch + Kibana sit under the `search` profile —
+  `make middleware-search-up` — so the default stack stays light.
+- Deployment material lives under `deploy/`: `deploy/middleware/` (the compose,
+  its `.env.example`, and `README.md`), `deploy/business/` (example app
+  compose + k8s manifests and their `README.md`), and SQL under `deploy/script/`
+  — Atlas versioned migrations in `deploy/script/migrations/`, an optional full
+  DDL dump in `deploy/script/schema.sql`. Add app compose/k8s manifests under
+  `deploy/business/` rather than at the repo root.
 - `data.database.auto_migrate` (ent `Schema.Create` on boot) is a
   development convenience: turn it off in production and run reviewed
   migrations before the new binary ships. `docs/ent.md` covers both paths.

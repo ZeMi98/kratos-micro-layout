@@ -58,7 +58,7 @@ pkg/nacos/                   Nacos 注册/发现、配置中心 Source 封装
 pkg/snowflake/               Twitter Snowflake 分布式 ID 生成器（64-bit，无协调、可排序）
 configs/user_center.yaml     每服务一份配置，集中存放
 configs/gateway.yaml
-deploy/                      部署物料：中间件 docker-compose；迁移 SQL 放 deploy/script/
+deploy/                      部署物料：middleware/（中间件 compose + .env.example）、business/（业务服务 compose/k8s 模板）、script/（迁移 SQL）
 docs/                        专题文档：ent.md（存储层全流程）
 Makefile / buf*.yaml         代码生成入口（`make` 或 `make help` 列出全部目标）
 Dockerfile                   参数化构建任意服务的镜像
@@ -66,7 +66,7 @@ Dockerfile                   参数化构建任意服务的镜像
 
 ## 多模块与 go.work 工作区
 
-本仓库是一个 **Go workspace（多模块）**：根模块承载 `api/`、`pkg/` 与 `app/gateway/`，而 `app/user_center/` 是一个**嵌套的独立模块**（自带 `go.mod`，同时作为服务模板托管在 [kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)）。根目录的 `go.work`（**已提交**）把两者纳入同一工作区：
+本仓库是一个 **Go workspace（多模块）**：根模块承载 `api/`、`pkg/` 与 `app/gateway/`，而 `app/user_center/` 是一个**嵌套的独立模块**（自带 `go.mod`，以 **git 子模块**形式挂进本仓库，同时作为服务模板托管在 [kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)）。根目录的 `go.work`（**已提交**）把两者纳入同一工作区：
 
 ```
 go 1.26.0
@@ -82,20 +82,33 @@ use (
 - **对命令行的影响**：嵌套模块会被父模块的裸 `./...` 排除，故 `Makefile` 的 `build`/`test` 显式带上 `./app/user_center/...`；工作区内 `cd app/user_center && go build ./...` 与根目录 `go build ./app/user_center/...` 均可正常解析。
 - **加依赖只在根目录做**：根模块自身并不 import ent/mysql/pgx（只有 user_center 用），因此**不要在根目录裸跑 `go mod tidy`** —— 它会把"仅 user_center 使用"的依赖当作无用而剪掉，破坏工作区解析。新增依赖统一用 `go get <module>` 加到根 `go.mod`；确实要清理时用 `make tidy`（临时隐藏 `go.work` 与嵌套 `go.mod`、把整棵树还原成单模块后再 tidy，退出时必定恢复）。`make generate` 刻意不含 tidy。
 - `go.work.sum` 是工作区派生的校验文件，已在 `.gitignore` 忽略；`go.work` 本身必须提交，否则新克隆无法解析 user_center。
+- **`app/user_center` 是 git 子模块**：`git clone` / `kratos new` 不会自动拉取，未初始化时该目录为空、`go.work` 解析失败。克隆后先 `git submodule update --init --recursive`（或 `make init`）；`Makefile` 的 go 目标（`build`/`test`/`run-*`/`ent`/`wire`）都挂了 `submodule-guard`，缺子模块时会给出明确提示而非费解的报错。
 - **`go:embed` 不能跨模块**：这也是 OpenAPI 文档落在根模块的 `pkg/docs/` 而不是 `app/user_center/` 里的原因（见「API 文档」）。
 
 ## 快速开始
 
 ### 1. 用模板创建新项目
 
+> **重要：`app/user_center` 是 git 子模块**（独立的服务模板仓库
+> [kratos-micro-sub-service-layout](https://github.com/ZeMi98/kratos-micro-sub-service-layout)）。
+> `git clone` 与 `kratos new` **都不会**自动拉取子模块；缺了它，`go.work` 会指向一个空目录，
+> 于是所有 `go build` / `make` 都以费解的“找不到模块”失败。克隆后务必初始化子模块 ——
+> `make init` 已包含这一步，也可手动 `git submodule update --init --recursive`。
+
 ```bash
 # 安装 Kratos CLI（若未安装）
 go install github.com/go-kratos/kratos/cmd/kratos/v3@latest
 
-# 基于本模板创建项目（替换 REPO 为你的 fork 地址）
+# 方式一：直接克隆（推荐带 --recurse-submodules，一步到位）
+git clone --recurse-submodules https://github.com/ZeMi98/kratos-micro-layout.git my-project
+cd my-project
+
+# 方式二：基于本模板创建项目（替换 REPO 为你的 fork 地址）
 kratos new my-project -r https://github.com/ZeMi98/kratos-micro-layout.git
 cd my-project
-make init          # 安装 buf、wire CLI
+
+# 初始化子模块 + 安装 buf、wire CLI（上一步没带 --recurse-submodules 时在此补救）
+make init
 ```
 
 ### 2. 在项目内新增微服务
@@ -621,16 +634,24 @@ middleware:
 
 ```
 deploy/
-  docker-compose.middleware.yaml   本地中间件：MySQL + Redis + Nacos（make middleware-up）
+  middleware/                      中间件栈（本地/自托管）
+    docker-compose.middleware.yaml MySQL + Redis + Nacos（默认）；ES + Kibana（search profile，选配）
+    .env.example                   所有可调项样例（含密钥生成命令）；复制为 .env 后按需改（.env 已 gitignore）
+    mysql-init/                    MySQL 首次启动自动执行的 *.sql / *.sh
+    README.md                      中间件部署说明
+  business/                        业务服务部署（gateway + user_center + 你孵化的服务）
+    docker-compose.app.yaml        示例：构建并运行业务服务，接入中间件网络
+    k8s/user_center.yaml           示例：单服务 ConfigMap + Secret + Deployment + Service 模板
+    README.md                      业务服务部署说明
   script/                          SQL 物料（当前为空占位）
     migrations/                    Atlas 生成的增量迁移（*.sql + atlas.sum），随代码提交
                                    —— 首次 `atlas migrate diff` 时创建
     schema.sql                     可选：某版本的全量 DDL，用于新环境初始化或 DBA 评审
 ```
 
-- **中间件**：`make middleware-up` / `make middleware-down`。这份 compose 面向本地开发，凭据、端口与 `configs/*.yaml` 的默认值对齐；生产环境请用自己的托管服务或改造后的清单。
+- **中间件**：`make middleware-up` / `make middleware-down`（ES + Kibana 用 `make middleware-search-up`）。这份 compose 面向本地开发，凭据、端口与 `configs/*.yaml` 的默认值对齐（都写成 `${VAR:-default}`，不放 `.env` 也能跑）；生产环境请用自己的托管服务或改造后的清单。详见 [deploy/middleware/README.md](deploy/middleware/README.md)。
+- **业务服务**：用仓库 `Dockerfile`（`SERVICE` 构建参数）打镜像，`deploy/business/` 给了 Compose 与 K8s 清单模板。详见 [deploy/business/README.md](deploy/business/README.md)。
 - **迁移 SQL**：由 Atlas 生成到 `deploy/script/migrations/`，在发布**之前**独立执行（`atlas migrate apply`）。`deploy/script/schema.sql` 可放全量 DDL 供新环境初始化或 DBA 评审。完整流程见 [docs/ent.md](docs/ent.md)。
-- 需要业务服务的 compose / k8s 清单时，也放进 `deploy/`（例如 `deploy/docker-compose.app.yaml`），保持"部署相关的东西都在一处"。
 
 ### 服务镜像
 
@@ -660,7 +681,8 @@ docker run -p 8080:8080 \
 
 | 命令 | 作用 |
 |---|---|
-| `make init` | 安装 buf、wire CLI |
+| `make init` | 初始化 git 子模块 + 安装 buf、wire CLI |
+| `make submodule-init` | 只拉取/初始化 `app/user_center` 子模块（`make init` 已含此步） |
 | `make api` | `api/**.proto` → Go/gRPC/HTTP 桩 + `pkg/docs/specs/<domain>/openapi.yaml`（每 domain 一份） |
 | `make config` | 各服务 `internal/conf/*.proto` → `*.pb.go` |
 | `make ent` | 改 ent schema 后重新生成 ORM 代码 |
@@ -669,7 +691,8 @@ docker run -p 8080:8080 \
 | `make all` | `api` + `config` + `generate`（全量重生成） |
 | `make build` | 编译两个模块的二进制到 `bin/` |
 | `make test` | 跑两个模块的全部测试 |
-| `make middleware-up` / `middleware-down` | 起 / 停本地中间件（`deploy/docker-compose.middleware.yaml`） |
+| `make middleware-up` / `middleware-down` | 起 / 停本地中间件（`deploy/middleware/docker-compose.middleware.yaml`） |
+| `make middleware-search-up` | 额外起 Elasticsearch + Kibana（`search` profile） |
 | `make run-user-center` / `make run-gateway` | 本地运行服务 / 网关 |
 | `make tidy` | 在不破坏 workspace 的前提下清理 `go.mod` / `go.sum` |
 
@@ -681,4 +704,6 @@ docker run -p 8080:8080 \
 |---|---|
 | [AGENTS.md](AGENTS.md) | 分层契约：service/biz/data 谁能 import 谁、DTO/DO/PO 边界、新增资源清单 |
 | [docs/ent.md](docs/ent.md) | ent 全流程：写 schema → 生成 → repo → 接线 → 本地开发 → 生产版本化迁移 |
+| [deploy/middleware/README.md](deploy/middleware/README.md) | 中间件栈部署：MySQL/Redis/Nacos（+ 选配 ES/Kibana）、`.env` 覆盖、开启鉴权 |
+| [deploy/business/README.md](deploy/business/README.md) | 业务服务部署：构建镜像、Compose 与 K8s 清单模板、配置接线注意点 |
 | `http://localhost:8000/swagger` | 运行时的可交互 API 文档 |

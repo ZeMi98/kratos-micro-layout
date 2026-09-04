@@ -203,7 +203,7 @@ data:
 ## 第 5 步：本地开发
 
 ```bash
-make middleware-up     # 起 MySQL / Redis / Nacos（deploy/docker-compose.middleware.yaml）
+make middleware-up     # 起 MySQL / Redis / Nacos（deploy/middleware/docker-compose.middleware.yaml）
 make run-user-center   # auto_migrate=true，启动时自动建表
 ```
 
@@ -221,7 +221,7 @@ compose 里的 `MYSQL_DATABASE: user_center` 负责**建库**；ent 的 `Schema.
 不是 bug。开发期最干净的做法是重建：
 
 ```bash
-docker compose -f deploy/docker-compose.middleware.yaml down -v && make middleware-up
+docker compose -f deploy/middleware/docker-compose.middleware.yaml down -v && make middleware-up
 ```
 
 ## 第 6 步：生产可用（版本化迁移）
@@ -344,5 +344,5 @@ func main() {
 | `unsupported ent driver: "sqlite"` | 模板已移除 sqlite | 用 `mysql` 或 `postgres`，本地跑 `make middleware-up` |
 | 时间差 8 小时 | DSN 缺 `parseTime=true` 或 `loc=Local` | 补上 DSN 参数 |
 | 唯一键冲突变成 500 | repo 没映射 `IsConstraintError` | 映射成 `biz.Err<Resource>AlreadyExists`（409） |
-| 本地库和 schema 对不齐 | `Schema.Create` 不删列/不改类型 | 重建：`docker compose -f deploy/docker-compose.middleware.yaml down -v` |
+| 本地库和 schema 对不齐 | `Schema.Create` 不删列/不改类型 | 重建：`docker compose -f deploy/middleware/docker-compose.middleware.yaml down -v` |
 | 翻页出现重复数据 | `Order` 没有确定的全序 | 末尾追加 `user.ByID()` 之类的稳定排序键 |

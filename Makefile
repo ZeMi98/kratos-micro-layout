@@ -17,12 +17,29 @@
 
 VERSION := $(shell git describe --tags --always)
 
-.PHONY: init api config ent wire generate all build test run-user-center \
-	run-gateway middleware-up middleware-down tidy help
+.PHONY: init submodule-init submodule-guard api config ent wire generate all build \
+	test run-user-center run-gateway middleware-up middleware-down middleware-search-up \
+	tidy help
 
-init: ## install the codegen CLIs (buf for protos, wire for dependency injection)
+# app/user_center is a git submodule (the standalone service-template repo). A plain
+# `git clone` — and `kratos new` — does NOT populate it, which leaves go.work pointing
+# at an empty dir so EVERY go command fails with a cryptic "module not found". `init`
+# pulls it in; `submodule-guard` (a prerequisite of the go targets below) fails fast
+# with a clear message when it is still missing.
+init: submodule-init ## init the git submodule + install the codegen CLIs (buf, wire)
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/bufbuild/buf/cmd/buf@latest
+
+submodule-init: ## fetch/initialize the app/user_center git submodule
+	@if [ -f .gitmodules ]; then git submodule update --init --recursive; \
+	else echo "  no .gitmodules — nothing to init"; fi
+
+submodule-guard:
+	@if [ ! -f app/user_center/go.mod ]; then \
+		echo "ERROR: app/user_center is empty — it is a git submodule that is not initialized."; \
+		echo "       Run 'make init' (or 'git submodule update --init --recursive'), then retry."; \
+		exit 1; \
+	fi
 
 api: ## regenerate the public API: protos -> Go/gRPC/HTTP stubs + one OpenAPI spec per api/<domain>
 	buf generate --template buf.gen.yaml
@@ -43,10 +60,10 @@ config: ## regenerate service config types: app/*/internal/conf/*.proto -> *.pb.
 	buf generate --template buf.gen.config.yaml
 	buf generate --template buf.gen.gw.yaml --path app/gateway/internal/conf/gateway.proto
 
-ent: ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
+ent: submodule-guard ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
 	cd app/user_center/internal/data/ent && go run generate.go
 
-wire: ## regenerate wire_gen.go after changing a ProviderSet or constructor signature
+wire: submodule-guard ## regenerate wire_gen.go after changing a ProviderSet or constructor signature
 	cd app/user_center/cmd/user_center && wire
 
 generate: ent wire ## regenerate ORM + DI code (the usual follow-up to a biz/data change)
@@ -55,23 +72,26 @@ all: api config generate ## regenerate everything: protos, configs, ORM and DI
 
 # The nested app/user_center module is invisible to the root module's bare ./...,
 # so build and test list it explicitly.
-build: ## compile both binaries into bin/
+build: submodule-guard ## compile both binaries into bin/
 	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
 
-test: ## run every test in both modules
+test: submodule-guard ## run every test in both modules
 	go test ./... ./app/user_center/...
 
-run-user-center: ## run user_center locally (configs/user_center.yaml; needs MySQL)
+run-user-center: submodule-guard ## run user_center locally (configs/user_center.yaml; needs MySQL)
 	go run ./app/user_center/cmd/user_center
 
-run-gateway: ## run the gateway locally (configs/gateway.yaml; needs Nacos)
+run-gateway: submodule-guard ## run the gateway locally (configs/gateway.yaml; needs Nacos)
 	go run ./app/gateway/cmd/gateway
 
-middleware-up: ## start the local middleware stack (MySQL + Redis + Nacos) from deploy/
-	docker compose -f deploy/docker-compose.middleware.yaml up -d
+middleware-up: ## start the local middleware stack (MySQL + Redis + Nacos) from deploy/middleware/
+	docker compose -f deploy/middleware/docker-compose.middleware.yaml up -d
 
 middleware-down: ## stop it again (pass -v by hand to also drop the data volumes)
-	docker compose -f deploy/docker-compose.middleware.yaml down
+	docker compose -f deploy/middleware/docker-compose.middleware.yaml down
+
+middleware-search-up: ## also start Elasticsearch + Kibana (the `search` profile)
+	docker compose -f deploy/middleware/docker-compose.middleware.yaml --profile search up -d
 
 # app/user_center borrows every dependency from the root go.mod through go.work,
 # so a bare `go mod tidy` here would delete the deps only that module uses (ent,

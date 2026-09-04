@@ -28,7 +28,7 @@ data:
     # two-line change, see the commented block below.
     driver: mysql
     # MySQL DSN. The default points at the local container started by
-    #   docker compose -f deploy/docker-compose.middleware.yaml up -d
+    #   docker compose -f deploy/middleware/docker-compose.middleware.yaml up -d
     # Override the whole DSN with KRATOS_DB_SOURCE (see the header note on
     # placeholders); never commit production credentials here.
     #   parseTime=true  DATETIME <-> time.Time instead of []byte

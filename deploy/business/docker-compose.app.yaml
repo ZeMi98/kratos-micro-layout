@@ -1,0 +1,76 @@
+# Example: build & run the business services (gateway + user_center) from this
+# template's Dockerfile, wired to the middleware stack in deploy/middleware/.
+#
+# This is a STARTING TEMPLATE, not a turnkey production manifest — read the
+# comments, adjust addresses/credentials, and add your own services.
+#
+# Prereq: the middleware stack must already be up, because these services join
+# its network and resolve `mysql` / `redis` / `nacos` by name:
+#
+#   make middleware-up
+#   docker compose -f deploy/business/docker-compose.app.yaml up -d --build
+#
+# Build context is the repo root (../..) so the Dockerfile sees go.work, go.mod
+# and the whole source tree.
+
+name: kratos-micro-layout-app
+
+networks:
+  # The network created by deploy/middleware/docker-compose.middleware.yaml.
+  # Its full name is "<compose project>_<network>" -> the middleware compose sets
+  # `name: kratos-micro-layout-middleware`, so the network is:
+  middleware_net:
+    external: true
+    name: kratos-micro-layout-middleware_middleware_net
+
+services:
+  user_center:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: app/user_center/cmd/user_center
+    image: kratos/user_center:local
+    restart: unless-stopped
+    command: ["app", "-conf", "/data/configs/user_center.yaml"]
+    volumes:
+      - ../../configs:/data/configs:ro
+    environment:
+      # The DSN uses configs' ${DB_SOURCE:...} placeholder, so it IS env-overridable.
+      # Reach MySQL by its compose service name on the shared network (NOT 127.0.0.1,
+      # which inside a container is the container itself).
+      KRATOS_DB_SOURCE: "root:123456@tcp(mysql:3306)/user_center?parseTime=true&loc=Local"
+      # The JWT signing secret also uses a placeholder -> env-overridable.
+      KRATOS_AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-in-production}
+      # NOTE: registry.address is a NESTED key. kratos's env source cannot override
+      # it, so to register with Nacos from inside the container you must set
+      # `registry.address: nacos:8848` in the mounted configs/user_center.yaml
+      # (or push that value through the Nacos config center). Leaving it empty keeps
+      # user_center standalone (no registration) — fine for a single-service smoke run.
+    ports:
+      - "8000:8000" # HTTP
+      - "9000:9000" # gRPC
+    networks:
+      - middleware_net
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: app/gateway/cmd/gateway
+    image: kratos/gateway:local
+    restart: unless-stopped
+    command: ["app", "-conf", "/data/configs/gateway.yaml"]
+    volumes:
+      - ../../configs:/data/configs:ro
+    # The gateway CANNOT start without discovery: it resolves every route's backend
+    # through Nacos. configs/gateway.yaml ships registry.address=127.0.0.1:8848, which
+    # is the container itself here — edit it to `nacos:8848` (nested key, not
+    # env-overridable) before starting, or the gateway hangs on registration.
+    ports:
+      - "8080:8080" # HTTP entry
+    networks:
+      - middleware_net
+    depends_on:
+      - user_center
