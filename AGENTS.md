@@ -331,6 +331,14 @@ lint` is the check-only fifth gate: default rule set, zero exceptions.
   the shared `app` root is what keeps every service's conf package unique in
   one workspace. `buf lint` runs the default rule set with no `except` list:
   a proto that violates a rule is rewritten, never exempted.
+- Formatting is `buf format`'s, not the author's: an option literal with more
+  than one field is one field per line (`string: {min_len: 3, max_len: 64}` is
+  semantically identical but non-canonical), a single scalar field stays inline.
+  `make check` runs `buf format --diff --exit-code`, so a hand-shaped proto
+  fails the gate instead of being rewritten by the next editor save; `make
+  fmt` fixes it.
+  gofmt has no exit-code flag, so Go formatting rides on `make fmt` being a
+  no-op (`gofmt -l .` printing nothing is the read-only check).
 
 ## Running locally & deploy
 
@@ -356,6 +364,9 @@ lint` is the check-only fifth gate: default rule set, zero exceptions.
 - Conventional Commits: `feat:`, `fix:`, `refactor:`, `chore(deps):`,
   `docs:`, `test:`. Regenerated files belong in the same commit as
   their source.
+- `make check` is the pre-commit gate — `buf format --diff --exit-code`,
+  `buf lint`, `go vet` and every test in both modules. Run it after a change
+  and before staging; `make fmt` first if it fails on formatting.
 - Never commit real credentials in `configs/*.yaml`. Inject them with a
   `${VAR:default}` placeholder resolved from a `KRATOS_`-prefixed env var,
   or source them from the Nacos config center. kratos's env source only

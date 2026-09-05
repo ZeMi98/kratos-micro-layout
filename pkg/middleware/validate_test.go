@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"buf.build/go/protovalidate"
 	v1 "kratos-micro-layout/api/user/v1"
+
+	"buf.build/go/protovalidate"
 
 	"github.com/go-kratos/kratos/v3/errors"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"

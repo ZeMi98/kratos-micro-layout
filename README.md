@@ -334,18 +334,25 @@ message RegisterRequest {
     (google.api.field_behavior) = REQUIRED,      // 进 OpenAPI 文档的 required 标记
     (buf.validate.field) = {                     // 运行时执行的规则（声明式）
       required: true
-      string: {min_len: 3, max_len: 64}
+      string: {
+        min_len: 3
+        max_len: 64
+      }
     },
     (validate.v1.error_message) = "username is required and must be between 3 and 64 characters"
   ];                                             // ↑ 客户端被拒时看到的文案
 
   // 可选字段只约束形状；PATCH 复用的字段另加 ignore: IGNORE_IF_ZERO_VALUE（见 user.proto）
   string nickname = 4 [
-    (buf.validate.field) = {string: {max_len: 64}},
+    (buf.validate.field) = {
+      string: {max_len: 64}
+    },
     (validate.v1.error_message) = "nickname must be at most 64 characters"
   ];
 }
 ```
+
+> 上面是 `buf format` 的规范形状：**含两个以上字段的选项字面量必须一行一个字段**（`min_len` / `max_len` 拆开），只有单个标量字段时才保持紧凑（`string: {max_len: 64}`）。手写成 `string: {min_len: 3, max_len: 64}` 语义完全相同，但 `make check` 里的 `buf format --diff --exit-code` 会失败，编辑器下次保存也会把它改回来 —— 直接跑 `make fmt` 让工具定形。
 
 **为什么需要这个扩展**：标准规则**自身没有 message 挂点**（protovalidate 里唯一原生的自定义文案只在 CEL 规则的 `Rule.message` 上），而且 `required` 失败会**短路**成一句通用的 `"value is required"`。不挂扩展的话，客户端只能读到 protovalidate 的英文模板（`"must be at least 3 characters"`、`"must be a valid email address"`）。把文案声明在规则旁边，既保留了标准规则的声明式写法，又能让客户端直接看到"该改什么"。
 
@@ -713,6 +720,8 @@ docker run -p 8080:8080 \
 | `make wire` | 改 ProviderSet / 构造函数签名后重新生成 `wire_gen.go` |
 | `make generate` | `ent` + `wire`（改完 biz/data 的常规收尾） |
 | `make all` | `api` + `config` + `generate`（全量重生成） |
+| `make fmt` | `buf format -w` + `gofmt -w .`：把所有 proto 与 Go 源文件就地格式化成工具规范形状 |
+| `make check` | 提交前门禁：`buf format --diff --exit-code` + `buf lint` + `go vet` + 两个模块的全部测试 |
 | `make build` | 编译两个模块的二进制到 `bin/` |
 | `make test` | 跑两个模块的全部测试 |
 | `make middleware-up` / `middleware-down` | 起 / 停本地中间件（`deploy/middleware/docker-compose.middleware.yaml`） |

@@ -55,7 +55,7 @@ endif
 API_DOMAINS := $(notdir $(patsubst %/,%,$(wildcard api/*/)))
 CONFIG_SERVICES := $(patsubst app/%/internal/conf,%,$(wildcard app/*/internal/conf))
 
-.PHONY: init api api-ext api-domain api-clean config ent wire generate all build \
+.PHONY: init api api-ext api-domain api-clean config ent wire generate all fmt check build \
 	test run-user-center run-gateway middleware-up middleware-down middleware-search-up \
 	tidy help \
 	$(API_DOMAINS:%=api-%) $(CONFIG_SERVICES:%=config-%)
@@ -111,6 +111,25 @@ wire: ## regenerate wire_gen.go after changing a ProviderSet or constructor sign
 generate: ent wire ## regenerate ORM + DI code (the usual follow-up to a biz/data change)
 
 all: api config generate ## regenerate everything: protos, configs, ORM and DI
+
+fmt: ## format every proto and Go source in place (buf format -w + gofmt -w)
+	buf format -w
+	gofmt -w .
+
+# buf format has --exit-code, so proto formatting is a hard gate here — a proto
+# written by hand in a non-canonical shape (a multi-field option literal kept on
+# one line, say) fails the check instead of being silently rewritten by the next
+# editor save. --diff is what keeps the gate quiet: bare `buf format` prints the
+# whole formatted tree to stdout (700+ lines here) even when nothing is wrong,
+# while --diff prints only what would change. gofmt has no such flag, and this
+# Makefile keeps every recipe a single portable command rather than a shell
+# conditional, so Go formatting is enforced by `make fmt` being a no-op;
+# `gofmt -l .` printing nothing is the read-only check.
+check: ## the pre-commit gate: proto format, buf lint, go vet and every test in both modules
+	buf format --diff --exit-code
+	buf lint
+	go vet ./... ./app/user_center/...
+	go test ./... ./app/user_center/...
 
 # The nested app/user_center module is invisible to the root module's bare ./...,
 # so build and test list it explicitly.

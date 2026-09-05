@@ -16,7 +16,10 @@ option go_package = "kratos-micro-layout/pkg/validate/v1;validateext";
 //     (google.api.field_behavior) = REQUIRED,
 //     (buf.validate.field) = {
 //       required: true
-//       string: { min_len: 3, max_len: 64 }
+//       string: {
+//         min_len: 3
+//         max_len: 64
+//       }
 //     },
 //     (validate.v1.error_message) = "username is required and must be between 3 and 64 characters"
 //   ];
