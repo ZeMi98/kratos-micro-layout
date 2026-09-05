@@ -242,11 +242,10 @@ components:
             description: |-
                 RegisterRequest is the request for Register.
 
-                 Field constraints are written as CEL rules with explicit `message` texts so
-                 a rejected request tells the client exactly what to fix (the protovalidate
-                 middleware surfaces them verbatim in a 400). Length rules double as presence
-                 checks: a rule that fails on "" makes a separate `required` violation
-                 redundant.
+                 Constraints use protovalidate's declarative standard rules; the client-facing
+                 failure text is declared beside them with the shared (validate.v1.error_message)
+                 option (see pkg/validate/v1/validate.proto), because the standard rules carry
+                 no message hook of their own.
         user.v1.RegisterResponse:
             type: object
             properties:
@@ -293,17 +292,18 @@ components:
                     description: |-
                         Field mask over the patchable profile fields: phone, nickname, avatar.
                          Selecting a field writes it (an empty value clears it); unselected fields
-                         are left alone.
+                         are left alone. No standard rule expresses "at least one path", so this one
+                         field keeps a CEL rule; the extension words the unset-mask case.
                     format: field-mask
             description: |-
                 UpdateProfileRequest is the request message for UpdateProfile. Only the
                  profile fields are patchable; update_mask selects which of them to apply. A
                  selected field is written with whatever value the request carries — leaving it
                  empty clears it — while an unselected field keeps its stored value.
-                 Constraints are CEL rules with explicit `message` texts so a rejected request
-                 tells the client exactly what to fix (the protovalidate middleware surfaces
-                 them in a 400); IGNORE_IF_ZERO_VALUE keeps an unselected field's zero value
-                 from tripping them.
+                 Constraints use protovalidate's standard rules; IGNORE_IF_ZERO_VALUE keeps an
+                 unselected field's zero value from tripping them. The client-facing failure
+                 text is declared beside the rules with the shared
+                 (validate.v1.error_message) option (see pkg/validate/v1/validate.proto).
         user.v1.UpdateProfileResponse:
             type: object
             properties:

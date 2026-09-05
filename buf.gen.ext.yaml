@@ -1,0 +1,14 @@
+version: v2
+# Generates only the Go stub for the shared validation extension
+# (pkg/validate/v1/validate.proto): it declares no service, so it needs neither
+# gRPC/HTTP stubs nor an OpenAPI document — just the extension descriptor that
+# pkg/middleware reads back at request time. Kept out of buf.gen.yaml because
+# that template's inputs are the api/ module and its openapi plugin would emit a
+# service-less spec for this file.
+inputs:
+  - directory: pkg
+plugins:
+  # Emitted next to the .proto source (paths=source_relative), like api/.
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]
+    out: pkg
+    opt: paths=source_relative

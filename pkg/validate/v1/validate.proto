@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+// The package mirrors this file's directory relative to the buf module root
+// (the monorepo's pkg/ dir) and satisfies buf lint PACKAGE_DIRECTORY_MATCH /
+// PACKAGE_VERSION_SUFFIX.
+package validate.v1;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "kratos-micro-layout/pkg/validate/v1;validateext";
+
+// `error_message` words the failure a field's buf.validate rules produce, as an
+// annotation of its own beside them:
+//
+//   string username = 1 [
+//     (google.api.field_behavior) = REQUIRED,
+//     (buf.validate.field) = {
+//       required: true
+//       string: { min_len: 3, max_len: 64 }
+//     },
+//     (validate.v1.error_message) = "username is required and must be between 3 and 64 characters"
+//   ];
+//
+// protovalidate's standard rules (required, string.min_len, string.email, ...)
+// carry no message hook of their own — the only native one sits on CEL rules —
+// and a failed `required` short-circuits to the generic "value is required", so
+// without this option the client would read protovalidate's stock English.
+// Declaring the description next to the constraint keeps both in the proto and
+// lets the rules stay declarative instead of being rewritten as CEL.
+//
+// pkg/middleware.ProtoValidator reads it back through reflection (the violation
+// carries the offending field's descriptor) and uses it as that field's
+// description; fields without the option keep protovalidate's default text, and
+// CEL rules keep their own `message`.
+//
+// The number sits in google.protobuf.FieldOptions' extension range (1000+);
+// 1100 avoids the well-known neighbours (field_behavior = 1052).
+extend google.protobuf.FieldOptions {
+  optional string error_message = 1100;
+}

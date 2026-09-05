@@ -11,6 +11,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	_ "kratos-micro-layout/pkg/validate/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -25,11 +26,10 @@ const (
 
 // RegisterRequest is the request for Register.
 //
-// Field constraints are written as CEL rules with explicit `message` texts so
-// a rejected request tells the client exactly what to fix (the protovalidate
-// middleware surfaces them verbatim in a 400). Length rules double as presence
-// checks: a rule that fails on "" makes a separate `required` violation
-// redundant.
+// Constraints use protovalidate's declarative standard rules; the client-facing
+// failure text is declared beside them with the shared (validate.v1.error_message)
+// option (see pkg/validate/v1/validate.proto), because the standard rules carry
+// no message hook of their own.
 type RegisterRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Login username. Must be unique.
@@ -637,30 +637,21 @@ var File_user_v1_auth_proto protoreflect.FileDescriptor
 
 const file_user_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/auth.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\"\xa8\x06\n" +
-	"\x0fRegisterRequest\x12\x9b\x01\n" +
-	"\busername\x18\x01 \x01(\tB\x7f\xe0A\x02\xbaHy\xba\x01v\n" +
-	"\x0fusername.length\x12<username is required and must be between 3 and 64 characters\x1a%this.size() >= 3 && this.size() <= 64R\busername\x12\x84\x02\n" +
-	"\x05email\x18\x02 \x01(\tB\xed\x01\xe0A\x02\xbaH\xe6\x01\xba\x01\x97\x01\n" +
-	"\femail.format\x12Eemail is required and must be a valid address, e.g. alice@example.com\x1a@this.matches('^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$')\xba\x01H\n" +
-	"\femail.length\x12$email must be at most 255 characters\x1a\x12this.size() <= 255R\x05email\x12\x9b\x01\n" +
-	"\bpassword\x18\x03 \x01(\tB\x7f\xe0A\x02\xbaHy\xba\x01v\n" +
-	"\x0fpassword.length\x12<password is required and must be between 8 and 72 characters\x1a%this.size() >= 8 && this.size() <= 72R\bpassword\x12n\n" +
-	"\bnickname\x18\x04 \x01(\tBR\xbaHO\xba\x01L\n" +
-	"\x0fnickname.length\x12&nickname must be at most 64 characters\x1a\x11this.size() <= 64R\bnickname\x12b\n" +
-	"\x05phone\x18\x05 \x01(\tBL\xbaHI\xba\x01F\n" +
-	"\fphone.length\x12#phone must be at most 32 characters\x1a\x11this.size() <= 32R\x05phone\"]\n" +
+	"\x12user/v1/auth.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1avalidate/v1/validate.proto\"\xec\x03\n" +
+	"\x0fRegisterRequest\x12j\n" +
+	"\busername\x18\x01 \x01(\tBN\xe0A\x02\xe2D<username is required and must be between 3 and 64 characters\xbaH\t\xc8\x01\x01r\x04\x10\x03\x18@R\busername\x12n\n" +
+	"\x05email\x18\x02 \x01(\tBX\xe0A\x02\xe2DEemail is required and must be a valid address, e.g. alice@example.com\xbaH\n" +
+	"\xc8\x01\x01r\x05\x18\xff\x01`\x01R\x05email\x12j\n" +
+	"\bpassword\x18\x03 \x01(\tBN\xe0A\x02\xe2D<password is required and must be between 8 and 72 characters\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\bpassword\x12L\n" +
+	"\bnickname\x18\x04 \x01(\tB0\xe2D&nickname must be at most 64 characters\xbaH\x04r\x02\x18@R\bnickname\x12C\n" +
+	"\x05phone\x18\x05 \x01(\tB-\xe2D#phone must be at most 32 characters\xbaH\x04r\x02\x18 R\x05phone\"]\n" +
 	"\x10RegisterResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\"\xd2\x01\n" +
-	"\fLoginRequest\x12`\n" +
-	"\busername\x18\x01 \x01(\tBD\xe0A\x02\xbaH>\xba\x01;\n" +
-	"\x17login.username.required\x12\x14username is required\x1a\n" +
-	"this != ''R\busername\x12`\n" +
-	"\bpassword\x18\x02 \x01(\tBD\xe0A\x02\xbaH>\xba\x01;\n" +
-	"\x17login.password.required\x12\x14password is required\x1a\n" +
-	"this != ''R\bpassword\"\x91\x01\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\"\x8a\x01\n" +
+	"\fLoginRequest\x12<\n" +
+	"\busername\x18\x01 \x01(\tB \xe0A\x02\xe2D\x14username is required\xbaH\x03\xc8\x01\x01R\busername\x12<\n" +
+	"\bpassword\x18\x02 \x01(\tB \xe0A\x02\xe2D\x14password is required\xbaH\x03\xc8\x01\x01R\bpassword\"\x91\x01\n" +
 	"\tTokenPair\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -674,19 +665,14 @@ const file_user_v1_auth_proto_rawDesc = "" +
 	"\busername\x18\x03 \x01(\tR\busername\"2\n" +
 	"\rLogoutRequest\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"\x10\n" +
-	"\x0eLogoutResponse\"\x84\x01\n" +
-	"\x13RefreshTokenRequest\x12m\n" +
-	"\rrefresh_token\x18\x01 \x01(\tBH\xe0A\x02\xbaHB\xba\x01?\n" +
-	"\x16refresh_token.required\x12\x19refresh_token is required\x1a\n" +
-	"this != ''R\frefreshToken\"B\n" +
+	"\x0eLogoutResponse\"a\n" +
+	"\x13RefreshTokenRequest\x12J\n" +
+	"\rrefresh_token\x18\x01 \x01(\tB%\xe0A\x02\xe2D\x19refresh_token is required\xbaH\x03\xc8\x01\x01R\frefreshToken\"B\n" +
 	"\x14RefreshTokenResponse\x12*\n" +
-	"\x06tokens\x18\x01 \x01(\v2\x12.user.v1.TokenPairR\x06tokens\"\xb1\x02\n" +
-	"\x15ChangePasswordRequest\x12i\n" +
-	"\fold_password\x18\x01 \x01(\tBF\xe0A\x02\xbaH@\xba\x01=\n" +
-	"\x15old_password.required\x12\x18old_password is required\x1a\n" +
-	"this != ''R\voldPassword\x12\xac\x01\n" +
-	"\fnew_password\x18\x02 \x01(\tB\x88\x01\xe0A\x02\xbaH\x81\x01\xba\x01~\n" +
-	"\x13new_password.length\x12@new_password is required and must be between 8 and 72 characters\x1a%this.size() >= 8 && this.size() <= 72R\vnewPassword\"\x18\n" +
+	"\x06tokens\x18\x01 \x01(\v2\x12.user.v1.TokenPairR\x06tokens\"\xd7\x01\n" +
+	"\x15ChangePasswordRequest\x12G\n" +
+	"\fold_password\x18\x01 \x01(\tB$\xe0A\x02\xe2D\x18old_password is required\xbaH\x03\xc8\x01\x01R\voldPassword\x12u\n" +
+	"\fnew_password\x18\x02 \x01(\tBR\xe0A\x02\xe2D@new_password is required and must be between 8 and 72 characters\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\vnewPassword\"\x18\n" +
 	"\x16ChangePasswordResponse2\xf8\x03\n" +
 	"\vAuthService\x12]\n" +
 	"\bRegister\x12\x18.user.v1.RegisterRequest\x1a\x19.user.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12Q\n" +

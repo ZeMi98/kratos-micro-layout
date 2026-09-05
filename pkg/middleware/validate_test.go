@@ -11,7 +11,6 @@ import (
 	v1 "kratos-micro-layout/api/user/v1"
 
 	"github.com/go-kratos/kratos/v3/errors"
-	"github.com/go-kratos/kratos/v3/middleware/validate"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -29,26 +28,33 @@ func TestProtoValidatorIgnoresNonProto(t *testing.T) {
 }
 
 func TestProtoValidatorListsEveryViolation(t *testing.T) {
-	// An empty login request violates both custom CEL rules; each violation
-	// must surface as "field: description from the proto".
+	// An empty login request trips both required rules; each violation must
+	// carry the description the proto declares beside the rule, on a 400.
 	err := ProtoValidator(&v1.LoginRequest{})
 	if err == nil {
 		t.Fatal("empty login request: expected a validation error")
 	}
+	if !errors.IsBadRequest(err) {
+		t.Fatalf("expected a 400 BadRequest, got: %v", err)
+	}
+	if got := errors.Reason(err); got != ValidationFailedReason {
+		t.Fatalf("reason = %q, want %q", got, ValidationFailedReason)
+	}
+	message := errors.FromError(err).Message
 	for _, want := range []string{
 		"username: username is required",
 		"password: password is required",
 	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not contain %q", err.Error(), want)
+		if !strings.Contains(message, want) {
+			t.Errorf("message %q does not contain %q", message, want)
 		}
 	}
-	if strings.Count(err.Error(), "; ") != 1 {
-		t.Errorf("violations should be joined into one line, got %q", err.Error())
+	if strings.Count(message, "; ") != 1 {
+		t.Errorf("violations should be joined into one line, got %q", message)
 	}
 }
 
-func TestProtoValidatorCustomLengthMessages(t *testing.T) {
+func TestProtoValidatorUsesDeclaredErrorMessages(t *testing.T) {
 	err := ProtoValidator(&v1.RegisterRequest{
 		Username: "ab",
 		Email:    "not-an-email",
@@ -57,13 +63,22 @@ func TestProtoValidatorCustomLengthMessages(t *testing.T) {
 	if err == nil {
 		t.Fatal("invalid register request: expected a validation error")
 	}
+	// The standard rules' stock texts ("must be at least 3 characters",
+	// "must be a valid email address") must be replaced by the
+	// (validate.v1.error_message) options.
+	message := errors.FromError(err).Message
 	for _, want := range []string{
 		"username is required and must be between 3 and 64 characters",
 		"email is required and must be a valid address",
 		"password is required and must be between 8 and 72 characters",
 	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not contain %q", err.Error(), want)
+		if !strings.Contains(message, want) {
+			t.Errorf("message %q does not contain %q", message, want)
+		}
+	}
+	for _, stock := range []string{"must be at least", "must be a valid email"} {
+		if strings.Contains(message, stock) {
+			t.Errorf("message %q still carries protovalidate stock text %q", message, stock)
 		}
 	}
 }
@@ -77,27 +92,33 @@ func TestProtoValidatorIgnoresZeroValueOnPatchFields(t *testing.T) {
 	if err := ProtoValidator(req); err != nil {
 		t.Fatalf("mask-only patch: unexpected error: %v", err)
 	}
-	// An empty mask violates the custom CEL rule on update_mask.
+	// An unset mask trips `required`, worded by the extension option.
 	err := ProtoValidator(&v1.UpdateProfileRequest{})
 	if err == nil {
 		t.Fatal("missing update_mask: expected a validation error")
 	}
-	if !strings.Contains(err.Error(), "update_mask") {
-		t.Errorf("error %q does not mention update_mask", err.Error())
+	if message := errors.FromError(err).Message; !strings.Contains(message, "update_mask must select at least one of") {
+		t.Errorf("message %q does not carry the declared description", message)
+	}
+	// A set-but-empty mask trips the CEL rule, which carries its own message.
+	err = ProtoValidator(&v1.UpdateProfileRequest{UpdateMask: &fieldmaskpb.FieldMask{}})
+	if err == nil {
+		t.Fatal("empty update_mask: expected a validation error")
+	}
+	if message := errors.FromError(err).Message; !strings.Contains(message, "update_mask must select at least one of") {
+		t.Errorf("message %q does not carry the CEL rule message", message)
 	}
 }
 
 // TestValidatorChainKeepsMessageClean walks the whole path a rejected request
-// travels: validate.Validator(ProtoValidator) → ErrorEncoder → envelope body.
-// kratos rewraps whatever the validator returns with
-// errors.BadRequest("VALIDATOR", err.Error()), so returning a kratos error from
-// ProtoValidator would leak its "error: code = … reason = …" rendering into the
-// message the client sees. This pins the contract end to end.
+// travels: Validator() → ErrorEncoder → envelope body. kratos' own
+// validate.Validator would rewrap the kratos error with err.Error() — the full
+// "error: code = … reason = …" rendering — burying the descriptions worded in
+// the proto; this pins that our middleware keeps them intact end to end.
 func TestValidatorChainKeepsMessageClean(t *testing.T) {
 	const want = "refresh_token: refresh_token is required"
 
-	mw := validate.Validator(ProtoValidator)
-	handler := mw(func(_ context.Context, _ any) (any, error) {
+	handler := Validator()(func(_ context.Context, _ any) (any, error) {
 		t.Fatal("handler must not run for an invalid request")
 		return nil, nil
 	})
@@ -110,8 +131,8 @@ func TestValidatorChainKeepsMessageClean(t *testing.T) {
 	if se.Code != http.StatusBadRequest {
 		t.Fatalf("code = %d, want 400", se.Code)
 	}
-	if se.Reason != "VALIDATOR" {
-		t.Fatalf("reason = %q, want VALIDATOR", se.Reason)
+	if se.Reason != ValidationFailedReason {
+		t.Fatalf("reason = %q, want %q", se.Reason, ValidationFailedReason)
 	}
 	if se.Message != want {
 		t.Fatalf("message = %q, want exactly %q", se.Message, want)

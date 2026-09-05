@@ -28,6 +28,7 @@ pkg/jwt/                     HS256 token engine (Manager/Claims): sign & verify 
 pkg/idgen/                   ID seam: Generator interface + snowflake-backed impl (int64 keys).
 pkg/nacos/                   Nacos registrar/discovery and config-source wrappers.
 pkg/snowflake/               Twitter Snowflake distributed ID generator (64-bit).
+pkg/validate/v1/             Shared proto extension: `(validate.v1.error_message)`, the per-field validation failure text.
 configs/<service>.yaml       Runtime config, one file per service. No secrets.
 deploy/                      Deployment material: middleware/ (compose + .env.example), business/ (app compose/k8s templates), script/ (SQL).
 docs/                        Long-form guides. `docs/ent.md` owns the storage layer end to end.
@@ -156,7 +157,7 @@ design rather than add the import.
 - Construct HTTP/gRPC servers, apply middleware, register services. No
   translation, no business logic.
 - _Middleware chain_ (outermost first): `recovery` → `tracing.Server()`
-  → request logger → rate limit (optional) → auth → `validate.Validator`.
+  → request logger → rate limit (optional) → auth → `pkgmw.Validator()`.
   HTTP and gRPC share the chain; only HTTP adds the response envelope.
   Rate limiting sits after logging (a shed 429 is still logged) and before
   auth (a flood does not burn JWT-verify CPU); `pkgmw.RateLimitServer`
@@ -166,15 +167,21 @@ design rather than add the import.
   imports it instead of re-declaring it: `codec.go` (envelope
   `ResponseEncoder`/`ErrorEncoder` + protojson `RequestDecoder`),
   `logging.go` (`RequestLogger`: never logs request bodies, so passwords
-  stay out of logs), `validate.go` (`ProtoValidator` runs the proto
-  `buf.validate` rules via protovalidate — no codegen — and renders every
-  violation as `field: custom message` joined into one 400 BadRequest),
+  stay out of logs), `validate.go` (`Validator()`/`ProtoValidator` run the
+  proto `buf.validate` rules via protovalidate — no codegen — and render
+  every violation as `field: description` joined into one 400 BadRequest
+  whose reason is `VALIDATION_FAILED`. The description is the field's
+  `(validate.v1.error_message)` option, read back through the violation's
+  `FieldDescriptor`; a field that declares none keeps protovalidate's own
+  text, and CEL rules keep their `message`. It is deliberately NOT kratos'
+  `validate.Validator`, which rewraps with `err.Error()` — the full
+  `error: code = … reason = …` rendering — burying the proto's wording),
   `auth.go`
   (`TokenVerifier` interface + `TokenAuth`: extracts the bearer token,
   verifies it, injects `AuthClaims` into `context`), `ratelimit.go`.
 - _What stays in `internal/server`_ is only the service-specific wiring:
   `http.go`/`grpc.go` assemble the chain from `pkg/middleware`
-  (`pkgmw.RequestLogger`, `pkgmw.ProtoValidator`, `pkgmw.RateLimitServer`,
+  (`pkgmw.RequestLogger`, `pkgmw.Validator`, `pkgmw.RateLimitServer`,
   `pkgmw.RequestDecoder`/`ResponseEncoder`/`ErrorEncoder`), and `auth.go`
   holds the `selector` that picks which RPCs are protected plus a tiny
   `TokenVerifier` adapter bridging `biz.AuthUsecase` to `pkg/middleware`.
@@ -235,10 +242,15 @@ design rather than add the import.
    `List<Resources>` / `Update<Resource>` / `Delete<Resource>` in
    `api/<domain>/<version>/` — one `<Rpc>Request` / `<Rpc>Response` pair per
    RPC, responses wrapping the resource — declare `buf.validate` rules on
-   request fields as CEL rules with an explicit `message` (`cel: {id,
-   message, expression}`) so a rejected request tells the client what to
-   fix; PATCH-update fields add `ignore: IGNORE_IF_ZERO_VALUE` so partial
-   updates stay partial. Then `make api` — which also refreshes that domain's
+   request fields as protovalidate's declarative standard rules (`required`,
+   `string: {min_len, max_len}`, `string: {email: true}`, …) and word the
+   failure beside them with the shared `(validate.v1.error_message)` option,
+   so a rejected request tells the client what to fix; the standard rules
+   carry no message hook of their own, hence the extension. Fall back to a
+   CEL rule (`cel: {id, message, expression}`) only where no standard rule
+   expresses the constraint. PATCH-update fields add `ignore:
+   IGNORE_IF_ZERO_VALUE` so partial updates stay partial. Then `make api` —
+   which also refreshes that domain's
    `pkg/docs/specs/<domain>/openapi.yaml`, so the Swagger surface tracks the
    proto, and `buf lint` stays clean.
 2. **DO + repo interface**: declare both in `biz`; build the usecase on
@@ -269,10 +281,19 @@ Four generators feed the tree; `make all` runs every one of them.
 
 | Target | Source | Output |
 |--------|--------|--------|
-| `make api` | `api/**.proto` | `*.pb.go`, `*_grpc.pb.go`, `*_http.pb.go`, `pkg/docs/specs/<domain>/openapi.yaml` (one per domain) |
+| `make api` | `pkg/validate/v1/validate.proto`, then `api/**.proto` | the extension's `*.pb.go`; per domain `*.pb.go`, `*_grpc.pb.go`, `*_http.pb.go`, `pkg/docs/specs/<domain>/openapi.yaml` |
 | `make config` | `app/*/internal/conf/*.proto` | config `*.pb.go` |
 | `make ent` | `internal/data/ent/schema/*.go` | the ent client, queries and `migrate/` tables |
 | `make wire` | `cmd/<service>/wire.go` + the ProviderSets | `wire_gen.go` |
+
+`buf.yaml` declares three workspace modules — `api`, `app`, `pkg` — and a
+module may import another's protos, which is how `api/user/v1/*.proto` picks
+up the `(validate.v1.error_message)` annotation declared in `pkg/validate/v1`.
+`make api` therefore regenerates `pkg` first (`buf.gen.ext.yaml`: a Go stub
+only, since the extension declares no service — no gRPC/HTTP stubs, no
+OpenAPI) and then each domain, so no domain is ever generated against a
+stale extension. Add a shared proto under `pkg/` the same way: a module entry
+in `buf.yaml` plus a template, not a hand-written stub.
 
 Never hand-edit anything they emit — including the ent-generated files
 (each carries a `// Code generated by ent, DO NOT EDIT.` header) and

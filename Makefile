@@ -55,7 +55,7 @@ endif
 API_DOMAINS := $(notdir $(patsubst %/,%,$(wildcard api/*/)))
 CONFIG_SERVICES := $(patsubst app/%/internal/conf,%,$(wildcard app/*/internal/conf))
 
-.PHONY: init api api-domain api-clean config ent wire generate all build \
+.PHONY: init api api-ext api-domain api-clean config ent wire generate all build \
 	test run-user-center run-gateway middleware-up middleware-down middleware-search-up \
 	tidy help \
 	$(API_DOMAINS:%=api-%) $(CONFIG_SERVICES:%=config-%)
@@ -70,7 +70,13 @@ init: ## install the codegen CLIs (buf, wire)
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/bufbuild/buf/cmd/buf@latest
 
-api: $(API_DOMAINS:%=api-%) api-clean ## regenerate the public API per domain: protos -> Go/gRPC/HTTP stubs + that domain's OpenAPI spec
+api: api-ext $(API_DOMAINS:%=api-%) api-clean ## regenerate the shared pkg/validate extension, then the public API per domain: protos -> Go/gRPC/HTTP stubs + that domain's OpenAPI spec
+
+# The shared validation extension (pkg/validate/v1) declares no service, so it
+# is generated on its own: a Go stub only, no per-domain stubs or spec.
+api-ext:
+	@echo   pkg/validate/v1 - shared validate.v1.error_message extension
+	buf generate --template buf.gen.ext.yaml
 
 # One sub-make per domain keeps every recipe line a single portable command.
 # Static pattern rules (not bare `api-%:`) because GNU make 3.81 — the default
