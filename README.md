@@ -357,7 +357,19 @@ message RegisterRequest {
 pkgmw.Validator()
 ```
 
-**这里刻意不用 kratos 的 `validate.Validator(...)`**：它会用 `err.Error()` 重新包一层 `errors.BadRequest("VALIDATOR", …)`，而 kratos error 的 `Error()` 是 `error: code = … reason = … message = … metadata = …` 的完整格式串 —— 你在 proto 里斟酌好的文案会被埋进那串噪声里，`VALIDATION_FAILED` 这个 reason 也永远浮不上来。自有中间件少一层包装，信封里的 `message` 就是纯文案。
+**与 kratos 官方中间件的关系**：kratos v3 的 `validate.Validator(validators ...ValidatorFunc)` 源码注释里给出的 protovalidate 示例，形状与本模板的 `ProtoValidator` 一致 —— 校验器本身是官方的扩展点，没有走偏。差别只在**挂载方式**：官方那版拿到校验器的 error 后无条件重新包一层 `errors.BadRequest("VALIDATOR", err.Error())`，而 kratos error 的 `Error()` 是 `error: code = … reason = … message = … metadata = … cause = …` 的完整格式串 —— 一旦校验器返回的已经是 kratos error，你在 proto 里斟酌好的文案就会被埋进那串噪声，reason 也被硬编码成 `VALIDATOR`。所以本模板用自有的 `Validator()`，它是官方版的一个**超集**：
+
+| 行为 | kratos `validate.Validator` | 本模板 `pkgmw.Validator()` |
+|---|---|---|
+| 跑请求自带的 `Validate() error` 方法 | ✓ | ✓ |
+| 跑传入的 proto 校验器 | ✓ | ✓（`ProtoValidator`） |
+| 保留原始 error 作为 cause | ✓ | ✓ |
+| 已是 kratos error 时原样透传 | ✗ 用 `err.Error()` 重包 | ✓ |
+| reason | 硬编码 `VALIDATOR` | `VALIDATION_FAILED` |
+
+反过来，若某个服务不需要自定义文案，直接挂官方的 `validate.Validator(fn)` 也行 —— 前提是 `fn` 返回**普通** error（kratos 会盖上 `VALIDATOR` reason，`message` 保留 `fn` 的文本）；`fn` 一旦返回 kratos error 就会被重包成上面那串格式串。
+
+> 官方文档「参数校验」那一页讲的是 **PGV（`protoc-gen-validate`）**：`(validate.rules)` 注解 + `--validate_out` **代码生成**，`validate.Validator()` 调的是生成出来的 `Validate()` 方法。PGV 上游已声明「reached a stable state and is in maintenance mode」并推荐迁移到 protovalidate，kratos v3 源码注释里给的示例也换成了 protovalidate（无需代码生成）。本模板走的是后者，官方文档那页可作背景参考。
 
 放在中间件链**最内层**（紧贴 handler）的意义是：`recovery` 兜住校验器自身的 panic、`logging` 记下这次 400、`ratelimit` 先把洪峰削掉、`auth` 先确认调用者身份 —— 无效 token 的请求连校验都不会跑，返回 401 而不是 400。规则按消息类型编译一次并缓存，后续请求开销很小。
 

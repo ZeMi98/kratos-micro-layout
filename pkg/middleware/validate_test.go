@@ -3,11 +3,13 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"buf.build/go/protovalidate"
 	v1 "kratos-micro-layout/api/user/v1"
 
 	"github.com/go-kratos/kratos/v3/errors"
@@ -152,5 +154,73 @@ func TestValidatorChainKeepsMessageClean(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK {
 		t.Errorf("HTTP status = %d, want 200 (the envelope carries the real code)", rec.Code)
+	}
+}
+
+// TestProtoValidatorPreservesCause pins the parity with kratos' own
+// validate.Validator: the structured protovalidate error stays reachable as the
+// cause, so logs and the gRPC status keep the per-violation detail even though
+// the envelope shows only the joined message.
+func TestProtoValidatorPreservesCause(t *testing.T) {
+	err := ProtoValidator(&v1.LoginRequest{})
+	if err == nil {
+		t.Fatal("empty login request: expected a validation error")
+	}
+	cause := errors.FromError(err).Unwrap()
+	if _, ok := cause.(*protovalidate.ValidationError); !ok {
+		t.Fatalf("cause = %T (%v), want *protovalidate.ValidationError", cause, cause)
+	}
+}
+
+// selfValidatingRequest is a request type carrying its own Validate method —
+// the interface kratos' validate.Validator also honours.
+type selfValidatingRequest struct{ err error }
+
+func (r selfValidatingRequest) Validate() error { return r.err }
+
+// TestValidatorRunsSelfValidateMethod covers the half of kratos' validate.Validator
+// that is not about proto rules: a request's own Validate method must still run.
+func TestValidatorRunsSelfValidateMethod(t *testing.T) {
+	handler := Validator()(func(_ context.Context, _ any) (any, error) {
+		t.Fatal("handler must not run for an invalid request")
+		return nil, nil
+	})
+
+	_, err := handler(context.Background(), selfValidatingRequest{err: fmt.Errorf("order_id must be set")})
+	if err == nil {
+		t.Fatal("expected a validation error")
+	}
+	se := errors.FromError(err)
+	if se.Code != http.StatusBadRequest {
+		t.Errorf("code = %d, want 400", se.Code)
+	}
+	if se.Reason != ValidationFailedReason {
+		t.Errorf("reason = %q, want %q", se.Reason, ValidationFailedReason)
+	}
+	if se.Message != "order_id must be set" {
+		t.Errorf("message = %q, want the Validate method's own text", se.Message)
+	}
+}
+
+// TestValidatorDoesNotRewrapAKratosError pins the deliberate difference from
+// kratos' validate.Validator: an error that already is a kratos error keeps its
+// own code, reason and message instead of being re-rendered through Error().
+func TestValidatorDoesNotRewrapAKratosError(t *testing.T) {
+	own := errors.Conflict("ORDER_DUPLICATED", "order_id already exists")
+	handler := Validator()(func(_ context.Context, _ any) (any, error) { return nil, nil })
+
+	_, err := handler(context.Background(), selfValidatingRequest{err: own})
+	if err == nil {
+		t.Fatal("expected a validation error")
+	}
+	se := errors.FromError(err)
+	if se.Reason != "ORDER_DUPLICATED" {
+		t.Errorf("reason = %q, want the validator's own ORDER_DUPLICATED", se.Reason)
+	}
+	if se.Message != "order_id already exists" {
+		t.Errorf("message = %q, want the validator's own text", se.Message)
+	}
+	if se.Code != http.StatusConflict {
+		t.Errorf("code = %d, want 409", se.Code)
 	}
 }

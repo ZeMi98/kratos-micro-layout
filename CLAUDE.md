@@ -173,9 +173,12 @@ design rather than add the import.
   whose reason is `VALIDATION_FAILED`. The description is the field's
   `(validate.v1.error_message)` option, read back through the violation's
   `FieldDescriptor`; a field that declares none keeps protovalidate's own
-  text, and CEL rules keep their `message`. It is deliberately NOT kratos'
-  `validate.Validator`, which rewraps with `err.Error()` — the full
-  `error: code = … reason = …` rendering — burying the proto's wording),
+  text, and CEL rules keep their `message`. `Validator()` is a superset of
+  kratos' `validate.Validator` — it also runs a request's own `Validate()
+  error` method and keeps the original error as the cause — differing only
+  in that it does not rewrap an error that already is a kratos error:
+  kratos rewraps with `err.Error()`, the full `error: code = … reason = …`
+  rendering, which would bury the proto's wording),
   `auth.go`
   (`TokenVerifier` interface + `TokenAuth`: extracts the bearer token,
   verifies it, injects `AuthClaims` into `context`), `ratelimit.go`.

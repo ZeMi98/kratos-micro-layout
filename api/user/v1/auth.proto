@@ -66,7 +66,10 @@ message RegisterRequest {
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      string: {min_len: 3, max_len: 64}
+      string: {
+        min_len: 3
+        max_len: 64
+      }
     },
     (validate.v1.error_message) = "username is required and must be between 3 and 64 characters"
   ];
@@ -89,20 +92,27 @@ message RegisterRequest {
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      string: {min_len: 8, max_len: 72}
+      string: {
+        min_len: 8
+        max_len: 72
+      }
     },
     (validate.v1.error_message) = "password is required and must be between 8 and 72 characters"
   ];
 
   // Display name (optional).
   string nickname = 4 [
-    (buf.validate.field) = {string: {max_len: 64}},
+    (buf.validate.field) = {
+      string: {max_len: 64}
+    },
     (validate.v1.error_message) = "nickname must be at most 64 characters"
   ];
 
   // Phone number (optional).
   string phone = 5 [
-    (buf.validate.field) = {string: {max_len: 32}},
+    (buf.validate.field) = {
+      string: {max_len: 32}
+    },
     (validate.v1.error_message) = "phone must be at most 32 characters"
   ];
 }
@@ -201,7 +211,10 @@ message ChangePasswordRequest {
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      string: {min_len: 8, max_len: 72}
+      string: {
+        min_len: 8
+        max_len: 72
+      }
     },
     (validate.v1.error_message) = "new_password is required and must be between 8 and 72 characters"
   ];
