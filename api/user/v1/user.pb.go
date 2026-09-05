@@ -13,7 +13,6 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	_ "kratos-micro-layout/pkg/validate/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -289,9 +288,8 @@ func (x *GetProfileResponse) GetUser() *User {
 // selected field is written with whatever value the request carries — leaving it
 // empty clears it — while an unselected field keeps its stored value.
 // Constraints use protovalidate's standard rules; IGNORE_IF_ZERO_VALUE keeps an
-// unselected field's zero value from tripping them. The client-facing failure
-// text is declared beside the rules with the shared
-// (validate.v1.error_message) option (see pkg/validate/v1/validate.proto).
+// unselected field's zero value from tripping them. A rejected field reports
+// protovalidate's own message, prefixed with the field path.
 type UpdateProfileRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Phone number (optional).
@@ -303,7 +301,7 @@ type UpdateProfileRequest struct {
 	// Field mask over the patchable profile fields: phone, nickname, avatar.
 	// Selecting a field writes it (an empty value clears it); unselected fields
 	// are left alone. No standard rule expresses "at least one path", so this one
-	// field keeps a CEL rule; the extension words the unset-mask case.
+	// field keeps a CEL rule, which carries its own message.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,4,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -417,7 +415,7 @@ var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/user.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1avalidate/v1/validate.proto\"\xd3\x02\n" +
+	"\x12user/v1/user.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd3\x02\n" +
 	"\x04User\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\x03B\x03\xe0A\x03R\x02id\x12\x1f\n" +
 	"\busername\x18\x02 \x01(\tB\x03\xe0A\x02R\busername\x12\x19\n" +
@@ -432,12 +430,14 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tupdatedAt\"\x13\n" +
 	"\x11GetProfileRequest\"7\n" +
 	"\x12GetProfileResponse\x12!\n" +
-	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user\"\xf5\x03\n" +
-	"\x14UpdateProfileRequest\x12F\n" +
-	"\x05phone\x18\x01 \x01(\tB0\xe2D#phone must be at most 32 characters\xbaH\a\xd8\x01\x01r\x02\x18 R\x05phone\x12O\n" +
-	"\bnickname\x18\x02 \x01(\tB3\xe2D&nickname must be at most 64 characters\xbaH\a\xd8\x01\x01r\x02\x18@R\bnickname\x12K\n" +
-	"\x06avatar\x18\x03 \x01(\tB3\xe2D%avatar must be at most 512 characters\xbaH\b\xd8\x01\x01r\x03\x18\x80\x04R\x06avatar\x12\xf6\x01\n" +
-	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\xb8\x01\xe2D@update_mask must select at least one of: phone, nickname, avatar\xbaHr\xba\x01l\n" +
+	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user\"\xbd\x02\n" +
+	"\x14UpdateProfileRequest\x12 \n" +
+	"\x05phone\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18 R\x05phone\x12&\n" +
+	"\bnickname\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18@R\bnickname\x12#\n" +
+	"\x06avatar\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\x80\x04R\x06avatar\x12\xb5\x01\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskBx\xe0A\x02\xbaHr\xba\x01l\n" +
 	"\x11update_mask.paths\x12@update_mask must select at least one of: phone, nickname, avatar\x1a\x15this.paths.size() > 0\xc8\x01\x01R\n" +
 	"updateMask\":\n" +
 	"\x15UpdateProfileResponse\x12!\n" +

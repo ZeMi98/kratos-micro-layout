@@ -8,7 +8,6 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "validate/v1/validate.proto";
 
 option go_package = "kratos-micro-layout/api/user/v1;v1";
 option java_multiple_files = true;
@@ -92,42 +91,33 @@ message GetProfileResponse {
 // selected field is written with whatever value the request carries — leaving it
 // empty clears it — while an unselected field keeps its stored value.
 // Constraints use protovalidate's standard rules; IGNORE_IF_ZERO_VALUE keeps an
-// unselected field's zero value from tripping them. The client-facing failure
-// text is declared beside the rules with the shared
-// (validate.v1.error_message) option (see pkg/validate/v1/validate.proto).
+// unselected field's zero value from tripping them. A rejected field reports
+// protovalidate's own message, prefixed with the field path.
 message UpdateProfileRequest {
   // Phone number (optional).
-  string phone = 1 [
-    (buf.validate.field) = {
-      ignore: IGNORE_IF_ZERO_VALUE
-      string: {max_len: 32}
-    },
-    (validate.v1.error_message) = "phone must be at most 32 characters"
-  ];
+  string phone = 1 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    string: {max_len: 32}
+  }];
 
   // Display name.
-  string nickname = 2 [
-    (buf.validate.field) = {
-      ignore: IGNORE_IF_ZERO_VALUE
-      string: {max_len: 64}
-    },
-    (validate.v1.error_message) = "nickname must be at most 64 characters"
-  ];
+  string nickname = 2 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    string: {max_len: 64}
+  }];
 
   // Avatar URL.
-  string avatar = 3 [
-    (buf.validate.field) = {
-      ignore: IGNORE_IF_ZERO_VALUE
-      string: {max_len: 512}
-    },
-    (validate.v1.error_message) = "avatar must be at most 512 characters"
-  ];
+  string avatar = 3 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    string: {max_len: 512}
+  }];
 
   // Field mask over the patchable profile fields: phone, nickname, avatar.
   // Selecting a field writes it (an empty value clears it); unselected fields
   // are left alone. No standard rule expresses "at least one path", so this one
-  // field keeps a CEL rule; the extension words the unset-mask case.
+  // field keeps a CEL rule, which carries its own message.
   google.protobuf.FieldMask update_mask = 4 [
+    (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
       cel: {
@@ -135,8 +125,7 @@ message UpdateProfileRequest {
         message: "update_mask must select at least one of: phone, nickname, avatar"
         expression: "this.paths.size() > 0"
       }
-    },
-    (validate.v1.error_message) = "update_mask must select at least one of: phone, nickname, avatar"
+    }
   ];
 }
 

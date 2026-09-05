@@ -28,7 +28,6 @@ pkg/jwt/                     HS256 token engine (Manager/Claims): sign & verify 
 pkg/idgen/                   ID seam: Generator interface + snowflake-backed impl (int64 keys).
 pkg/nacos/                   Nacos registrar/discovery and config-source wrappers.
 pkg/snowflake/               Twitter Snowflake distributed ID generator (64-bit).
-pkg/validate/v1/             Shared proto extension: `(validate.v1.error_message)`, the per-field validation failure text.
 configs/<service>.yaml       Runtime config, one file per service. No secrets.
 deploy/                      Deployment material: middleware/ (compose + .env.example), business/ (app compose/k8s templates), script/ (SQL).
 docs/                        Long-form guides. `docs/ent.md` owns the storage layer end to end.
@@ -169,16 +168,16 @@ design rather than add the import.
   `logging.go` (`RequestLogger`: never logs request bodies, so passwords
   stay out of logs), `validate.go` (`Validator()`/`ProtoValidator` run the
   proto `buf.validate` rules via protovalidate — no codegen — and render
-  every violation as `field: description` joined into one 400 BadRequest
-  whose reason is `VALIDATION_FAILED`. The description is the field's
-  `(validate.v1.error_message)` option, read back through the violation's
-  `FieldDescriptor`; a field that declares none keeps protovalidate's own
-  text, and CEL rules keep their `message`. `Validator()` is a superset of
-  kratos' `validate.Validator` — it also runs a request's own `Validate()
-  error` method and keeps the original error as the cause — differing only
-  in that it does not rewrap an error that already is a kratos error:
-  kratos rewraps with `err.Error()`, the full `error: code = … reason = …`
-  rendering, which would bury the proto's wording),
+  every violation as `field: message` joined into one 400 BadRequest whose
+  reason is `VALIDATION_FAILED`. The message is protovalidate's own: the
+  stock text for a standard rule (`required`, `string.min_len`, …), or the
+  `message` a CEL rule declares — no custom extension proto is involved.
+  `Validator()` is a superset of kratos' `validate.Validator` — it also runs
+  a request's own `Validate() error` method and keeps the original error as
+  the cause — differing only in that it does not rewrap an error that
+  already is a kratos error: kratos rewraps with `err.Error()`, the full
+  `error: code = … reason = …` rendering, which would bury the joined field
+  messages),
   `auth.go`
   (`TokenVerifier` interface + `TokenAuth`: extracts the bearer token,
   verifies it, injects `AuthClaims` into `context`), `ratelimit.go`.
@@ -246,12 +245,17 @@ design rather than add the import.
    `api/<domain>/<version>/` — one `<Rpc>Request` / `<Rpc>Response` pair per
    RPC, responses wrapping the resource — declare `buf.validate` rules on
    request fields as protovalidate's declarative standard rules (`required`,
-   `string: {min_len, max_len}`, `string: {email: true}`, …) and word the
-   failure beside them with the shared `(validate.v1.error_message)` option,
-   so a rejected request tells the client what to fix; the standard rules
-   carry no message hook of their own, hence the extension. Fall back to a
-   CEL rule (`cel: {id, message, expression}`) only where no standard rule
-   expresses the constraint. PATCH-update fields add `ignore:
+   `string: {min_len, max_len}`, `string: {email: true}`, …); a rejected
+   field reports protovalidate's own message, prefixed with the field path by
+   `pkg/middleware`. Fall back to a CEL rule (`cel: {id, message,
+   expression}`) only where no standard rule expresses the constraint — CEL
+   is also protovalidate's sole native hook for a custom message. A required
+   field carries BOTH
+   `(google.api.field_behavior) = REQUIRED` and `required: true`: the first is
+   the only thing protoc-gen-openapi reads into the schema's `required` list,
+   the second the only thing protovalidate enforces, neither tool reads the
+   other, and `buf lint` checks neither — so dropping one silently makes the
+   docs or the runtime lie. PATCH-update fields add `ignore:
    IGNORE_IF_ZERO_VALUE` so partial updates stay partial. Then `make api` —
    which also refreshes that domain's
    `pkg/docs/specs/<domain>/openapi.yaml`, so the Swagger surface tracks the
@@ -284,19 +288,17 @@ Four generators feed the tree; `make all` runs every one of them.
 
 | Target | Source | Output |
 |--------|--------|--------|
-| `make api` | `pkg/validate/v1/validate.proto`, then `api/**.proto` | the extension's `*.pb.go`; per domain `*.pb.go`, `*_grpc.pb.go`, `*_http.pb.go`, `pkg/docs/specs/<domain>/openapi.yaml` |
+| `make api` | `api/**.proto` | per domain `*.pb.go`, `*_grpc.pb.go`, `*_http.pb.go`, `pkg/docs/specs/<domain>/openapi.yaml` |
 | `make config` | `app/*/internal/conf/*.proto` | config `*.pb.go` |
 | `make ent` | `internal/data/ent/schema/*.go` | the ent client, queries and `migrate/` tables |
 | `make wire` | `cmd/<service>/wire.go` + the ProviderSets | `wire_gen.go` |
 
-`buf.yaml` declares three workspace modules — `api`, `app`, `pkg` — and a
-module may import another's protos, which is how `api/user/v1/*.proto` picks
-up the `(validate.v1.error_message)` annotation declared in `pkg/validate/v1`.
-`make api` therefore regenerates `pkg` first (`buf.gen.ext.yaml`: a Go stub
-only, since the extension declares no service — no gRPC/HTTP stubs, no
-OpenAPI) and then each domain, so no domain is ever generated against a
-stale extension. Add a shared proto under `pkg/` the same way: a module entry
-in `buf.yaml` plus a template, not a hand-written stub.
+`buf.yaml` declares two workspace modules — `api` (the public contract) and
+`app` (each service's config proto). Validation uses only protovalidate's
+stock `buf.validate` annotations, so there is no custom extension proto and no
+third module. `make api` generates each domain through `buf.gen.yaml`
+(Go/gRPC/HTTP stubs + that domain's OpenAPI); `make config` generates each
+service's conf proto through `buf.gen.conf.yaml`.
 
 Never hand-edit anything they emit — including the ent-generated files
 (each carries a `// Code generated by ent, DO NOT EDIT.` header) and

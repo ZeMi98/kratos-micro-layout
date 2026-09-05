@@ -242,10 +242,12 @@ components:
             description: |-
                 RegisterRequest is the request for Register.
 
-                 Constraints use protovalidate's declarative standard rules; the client-facing
-                 failure text is declared beside them with the shared (validate.v1.error_message)
-                 option (see pkg/validate/v1/validate.proto), because the standard rules carry
-                 no message hook of their own.
+                 Constraints use protovalidate's declarative standard rules (required, length,
+                 email). A rejected field reports protovalidate's own message, which the
+                 validation middleware prefixes with the field path — see
+                 pkg/middleware/validate.go. `(google.api.field_behavior) = REQUIRED` is not
+                 redundant with `required: true`: it feeds the OpenAPI `required` list, while
+                 the buf.validate rule is what the middleware enforces at runtime.
         user.v1.RegisterResponse:
             type: object
             properties:
@@ -276,6 +278,8 @@ components:
                     description: Token type. Always "Bearer".
             description: TokenPair is a pair of access and refresh tokens.
         user.v1.UpdateProfileRequest:
+            required:
+                - update_mask
             type: object
             properties:
                 phone:
@@ -293,7 +297,7 @@ components:
                         Field mask over the patchable profile fields: phone, nickname, avatar.
                          Selecting a field writes it (an empty value clears it); unselected fields
                          are left alone. No standard rule expresses "at least one path", so this one
-                         field keeps a CEL rule; the extension words the unset-mask case.
+                         field keeps a CEL rule, which carries its own message.
                     format: field-mask
             description: |-
                 UpdateProfileRequest is the request message for UpdateProfile. Only the
@@ -301,9 +305,8 @@ components:
                  selected field is written with whatever value the request carries — leaving it
                  empty clears it — while an unselected field keeps its stored value.
                  Constraints use protovalidate's standard rules; IGNORE_IF_ZERO_VALUE keeps an
-                 unselected field's zero value from tripping them. The client-facing failure
-                 text is declared beside the rules with the shared
-                 (validate.v1.error_message) option (see pkg/validate/v1/validate.proto).
+                 unselected field's zero value from tripping them. A rejected field reports
+                 protovalidate's own message, prefixed with the field path.
         user.v1.UpdateProfileResponse:
             type: object
             properties:

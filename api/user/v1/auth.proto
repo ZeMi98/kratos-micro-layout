@@ -5,7 +5,6 @@ package user.v1;
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
-import "validate/v1/validate.proto";
 
 option go_package = "kratos-micro-layout/api/user/v1;v1";
 option java_multiple_files = true;
@@ -56,10 +55,12 @@ service AuthService {
 
 // RegisterRequest is the request for Register.
 //
-// Constraints use protovalidate's declarative standard rules; the client-facing
-// failure text is declared beside them with the shared (validate.v1.error_message)
-// option (see pkg/validate/v1/validate.proto), because the standard rules carry
-// no message hook of their own.
+// Constraints use protovalidate's declarative standard rules (required, length,
+// email). A rejected field reports protovalidate's own message, which the
+// validation middleware prefixes with the field path — see
+// pkg/middleware/validate.go. `(google.api.field_behavior) = REQUIRED` is not
+// redundant with `required: true`: it feeds the OpenAPI `required` list, while
+// the buf.validate rule is what the middleware enforces at runtime.
 message RegisterRequest {
   // Login username. Must be unique.
   string username = 1 [
@@ -70,8 +71,7 @@ message RegisterRequest {
         min_len: 3
         max_len: 64
       }
-    },
-    (validate.v1.error_message) = "username is required and must be between 3 and 64 characters"
+    }
   ];
 
   // Email address. Must be unique.
@@ -83,8 +83,7 @@ message RegisterRequest {
         email: true
         max_len: 255
       }
-    },
-    (validate.v1.error_message) = "email is required and must be a valid address, e.g. alice@example.com"
+    }
   ];
 
   // Plain-text password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
@@ -96,25 +95,18 @@ message RegisterRequest {
         min_len: 8
         max_len: 72
       }
-    },
-    (validate.v1.error_message) = "password is required and must be between 8 and 72 characters"
+    }
   ];
 
   // Display name (optional).
-  string nickname = 4 [
-    (buf.validate.field) = {
-      string: {max_len: 64}
-    },
-    (validate.v1.error_message) = "nickname must be at most 64 characters"
-  ];
+  string nickname = 4 [(buf.validate.field) = {
+    string: {max_len: 64}
+  }];
 
   // Phone number (optional).
-  string phone = 5 [
-    (buf.validate.field) = {
-      string: {max_len: 32}
-    },
-    (validate.v1.error_message) = "phone must be at most 32 characters"
-  ];
+  string phone = 5 [(buf.validate.field) = {
+    string: {max_len: 32}
+  }];
 }
 
 // RegisterResponse is the response for Register.
@@ -134,15 +126,13 @@ message LoginRequest {
   // Login username.
   string username = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true,
-    (validate.v1.error_message) = "username is required"
+    (buf.validate.field).required = true
   ];
 
   // Plain-text password.
   string password = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true,
-    (validate.v1.error_message) = "password is required"
+    (buf.validate.field).required = true
   ];
 }
 
@@ -187,8 +177,7 @@ message RefreshTokenRequest {
   // A valid refresh token.
   string refresh_token = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true,
-    (validate.v1.error_message) = "refresh_token is required"
+    (buf.validate.field).required = true
   ];
 }
 
@@ -202,8 +191,7 @@ message ChangePasswordRequest {
   // Current password for verification.
   string old_password = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true,
-    (validate.v1.error_message) = "old_password is required"
+    (buf.validate.field).required = true
   ];
 
   // New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
@@ -215,8 +203,7 @@ message ChangePasswordRequest {
         min_len: 8
         max_len: 72
       }
-    },
-    (validate.v1.error_message) = "new_password is required and must be between 8 and 72 characters"
+    }
   ];
 }
 

@@ -8,17 +8,11 @@ version: v2
 #     Per-service roots would collide on a shared conf.v1 package the moment a
 #     second service is incubated from the template, because every service's
 #     conf proto declares the same message names (Bootstrap, Server, ...).
-#   pkg - the shared contract extras: pkg/validate/v1 declares the
-#     `validate.v1.error_message` extension that words a field's validation
-#     failure (see pkg/validate/v1/validate.proto). It lives outside api/ so
-#     the Makefile's api/<domain> discovery never mistakes it for a service
-#     domain.
 # `buf lint` runs with its default rule set and no exceptions: the protos
 # themselves are written to satisfy it (see AGENTS.md "Naming & error reasons").
 modules:
   - path: api
   - path: app
-  - path: pkg
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/bufbuild/protovalidate

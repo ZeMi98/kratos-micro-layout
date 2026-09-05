@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 
-	validateext "kratos-micro-layout/pkg/validate/v1"
-
 	"buf.build/go/protovalidate"
 
 	"github.com/go-kratos/kratos/v3/errors"
@@ -26,11 +24,10 @@ const ValidationFailedReason = "VALIDATION_FAILED"
 // after the first request is small.
 //
 // A failed validation becomes a kratos BadRequest whose message lists every
-// violated field as "<field path>: <description>", joined with "; " so a client
-// can split on it and highlight all offending inputs at once. The description
-// is the (validate.v1.error_message) option declared beside the field's rules
-// when present — the standard rules carry no message hook of their own — and
-// protovalidate's own text otherwise (CEL rules keep their `message`).
+// violated field as "<field path>: <message>", joined with "; " so a client can
+// split on it and highlight all offending inputs at once. The message is
+// protovalidate's own: the stock text for a standard rule (required,
+// string.min_len, string.email, …), or the `message` a CEL rule declares.
 // A compilation or other internal protovalidate failure is a server-side bug
 // and is passed through unchanged so it surfaces as a 500.
 //
@@ -107,38 +104,15 @@ func toBadRequest(err error) error {
 	return errors.BadRequest(ValidationFailedReason, err.Error()).WithCause(err)
 }
 
-// violationText renders one violation as "<field path>: <description>". The
-// description prefers the field's (validate.v1.error_message) option, read back
-// through the descriptor protovalidate attaches to the violation; fields without
-// the option fall back to the rule's own text.
+// violationText renders one violation as "<field path>: <message>". The message
+// is protovalidate's own — the stock text for a standard rule (required,
+// string.min_len, string.email, …), or the `message` a CEL rule declares. A
+// message-level violation has no field path to prefix.
 func violationText(violation *protovalidate.Violation) string {
 	field := protovalidate.FieldPathString(violation.Proto.GetField())
-	message := customMessage(violation)
-	if message == "" {
-		message = violation.Proto.GetMessage()
-	}
+	message := violation.Proto.GetMessage()
 	if field == "" {
-		// A message-level rule: no field path to prefix.
 		return message
 	}
 	return field + ": " + message
-}
-
-// customMessage returns the (validate.v1.error_message) option of the violated
-// field, or "" when the field declares none.
-//
-// GetExtension hands back the plain Go value — a string here, not a *string —
-// so the assertion must match; asserting a pointer silently yields "" and
-// every failure text would fall back to protovalidate's stock wording.
-func customMessage(violation *protovalidate.Violation) string {
-	fd := violation.FieldDescriptor
-	if fd == nil {
-		return ""
-	}
-	opts := fd.Options()
-	if opts == nil || !proto.HasExtension(opts, validateext.E_ErrorMessage) {
-		return ""
-	}
-	message, _ := proto.GetExtension(opts, validateext.E_ErrorMessage).(string)
-	return message
 }

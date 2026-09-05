@@ -31,8 +31,8 @@ func TestProtoValidatorIgnoresNonProto(t *testing.T) {
 }
 
 func TestProtoValidatorListsEveryViolation(t *testing.T) {
-	// An empty login request trips both required rules; each violation must
-	// carry the description the proto declares beside the rule, on a 400.
+	// An empty login request trips both required rules; each violation is
+	// rendered as "<field>: <protovalidate message>", joined on one 400.
 	err := ProtoValidator(&v1.LoginRequest{})
 	if err == nil {
 		t.Fatal("empty login request: expected a validation error")
@@ -45,8 +45,8 @@ func TestProtoValidatorListsEveryViolation(t *testing.T) {
 	}
 	message := errors.FromError(err).Message
 	for _, want := range []string{
-		"username: username is required",
-		"password: password is required",
+		"username: value is required",
+		"password: value is required",
 	} {
 		if !strings.Contains(message, want) {
 			t.Errorf("message %q does not contain %q", message, want)
@@ -57,7 +57,7 @@ func TestProtoValidatorListsEveryViolation(t *testing.T) {
 	}
 }
 
-func TestProtoValidatorUsesDeclaredErrorMessages(t *testing.T) {
+func TestProtoValidatorReportsFieldPathAndStockMessage(t *testing.T) {
 	err := ProtoValidator(&v1.RegisterRequest{
 		Username: "ab",
 		Email:    "not-an-email",
@@ -66,22 +66,17 @@ func TestProtoValidatorUsesDeclaredErrorMessages(t *testing.T) {
 	if err == nil {
 		t.Fatal("invalid register request: expected a validation error")
 	}
-	// The standard rules' stock texts ("must be at least 3 characters",
-	// "must be a valid email address") must be replaced by the
-	// (validate.v1.error_message) options.
+	// Each field reports protovalidate's own message for the standard rule it
+	// broke, prefixed with the field path so a client can map it back to the
+	// offending input. No custom extension is involved.
 	message := errors.FromError(err).Message
 	for _, want := range []string{
-		"username is required and must be between 3 and 64 characters",
-		"email is required and must be a valid address",
-		"password is required and must be between 8 and 72 characters",
+		"username: must be at least 3 characters",
+		"email: must be a valid email address",
+		"password: must be at least 8 characters",
 	} {
 		if !strings.Contains(message, want) {
 			t.Errorf("message %q does not contain %q", message, want)
-		}
-	}
-	for _, stock := range []string{"must be at least", "must be a valid email"} {
-		if strings.Contains(message, stock) {
-			t.Errorf("message %q still carries protovalidate stock text %q", message, stock)
 		}
 	}
 }
@@ -95,15 +90,17 @@ func TestProtoValidatorIgnoresZeroValueOnPatchFields(t *testing.T) {
 	if err := ProtoValidator(req); err != nil {
 		t.Fatalf("mask-only patch: unexpected error: %v", err)
 	}
-	// An unset mask trips `required`, worded by the extension option.
+	// An unset mask trips `required`, which short-circuits to protovalidate's
+	// stock "value is required" — the CEL rule below it is never reached.
 	err := ProtoValidator(&v1.UpdateProfileRequest{})
 	if err == nil {
 		t.Fatal("missing update_mask: expected a validation error")
 	}
-	if message := errors.FromError(err).Message; !strings.Contains(message, "update_mask must select at least one of") {
-		t.Errorf("message %q does not carry the declared description", message)
+	if message := errors.FromError(err).Message; !strings.Contains(message, "update_mask: value is required") {
+		t.Errorf("message %q does not carry the required-rule text", message)
 	}
-	// A set-but-empty mask trips the CEL rule, which carries its own message.
+	// A set-but-empty mask passes `required` and trips the CEL rule, which
+	// carries its own message.
 	err = ProtoValidator(&v1.UpdateProfileRequest{UpdateMask: &fieldmaskpb.FieldMask{}})
 	if err == nil {
 		t.Fatal("empty update_mask: expected a validation error")
@@ -116,10 +113,10 @@ func TestProtoValidatorIgnoresZeroValueOnPatchFields(t *testing.T) {
 // TestValidatorChainKeepsMessageClean walks the whole path a rejected request
 // travels: Validator() → ErrorEncoder → envelope body. kratos' own
 // validate.Validator would rewrap the kratos error with err.Error() — the full
-// "error: code = … reason = …" rendering — burying the descriptions worded in
-// the proto; this pins that our middleware keeps them intact end to end.
+// "error: code = … reason = …" rendering — burying the joined field messages;
+// this pins that our middleware keeps them intact end to end.
 func TestValidatorChainKeepsMessageClean(t *testing.T) {
-	const want = "refresh_token: refresh_token is required"
+	const want = "refresh_token: value is required"
 
 	handler := Validator()(func(_ context.Context, _ any) (any, error) {
 		t.Fatal("handler must not run for an invalid request")
