@@ -22,7 +22,7 @@ app/gateway/cmd/gateway/     Gateway entrypoint (no Wire: manual assembly).
 app/gateway/internal/proxy/  Reverse proxy: discovery + selector LB + per-upstream breaker.
 app/gateway/internal/server/ Gateway HTTP server, CORS, edge rate-limit filter, routes.
 pkg/docs/                    Per-domain OpenAPI documents (go:embed specs/<domain>/) + `/swagger` UI route.
-pkg/log/                     Logger builder: stdlib log/slog (Text/JSON) + lumberjack rotation.
+pkg/log/                     Logger builder: stdlib log/slog (Text/JSON/Color) + lumberjack rotation.
 pkg/middleware/              Reusable transport middleware: auth, codec (envelope+protojson), logging, validate, rate limiting.
 pkg/jwt/                     HS256 token engine (Manager/Claims): sign & verify access/refresh tokens.
 pkg/idgen/                   ID seam: Generator interface + snowflake-backed impl (int64 keys).

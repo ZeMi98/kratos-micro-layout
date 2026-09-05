@@ -26,7 +26,7 @@ data:
     # ent is the storage engine (app/user_center/internal/data/ent). Two
     # drivers are wired up: "mysql" (default) and "postgres" — switching is a
     # two-line change, see the commented block below.
-    driver: mysql
+    driver: mysql         # mysql/postgres
     # MySQL DSN. The default points at the local container started by
     #   docker compose -f deploy/middleware/docker-compose.middleware.yaml up -d
     # Override the whole DSN with KRATOS_DB_SOURCE (see the header note on
@@ -60,9 +60,19 @@ snowflake:
   node_id: 0              # cluster-unique in [0, 1023]; override per instance
 
 log:
-  level: info
-  output: stdout
-  format: text
+  level: info             # debug/info/warn/error
+  output: stdout          # stdout/stderr/file
+  format: text            # text/json/color (color = ANSI single-line, local dev only)
+  file_path: ""           # required when output=file; rotated by size (see rotation)
+  add_source: true        # include file:line in each record (small runtime cost)
+  no_color: false         # force color off even when format=color (e.g. CI)
+  # Size-based rotation; applies only when output=file. The values below are the
+  # recommended production defaults; 0 for max_backups/max_age retains everything.
+  rotation:
+    max_size: 100         # megabytes per file before it is rotated
+    max_backups: 5        # rotated files to keep
+    max_age: 30           # days to keep rotated files
+    compress: true        # gzip rotated files
 
 # Service registration, discovery and remote config — all backed by Nacos.
 # An empty address disables registration and skips the remote config source

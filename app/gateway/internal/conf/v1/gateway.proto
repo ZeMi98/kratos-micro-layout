@@ -65,14 +65,36 @@ message Cors {
 
 // Log configures the logging backend (standard library log/slog).
 message Log {
-  // Minimum log level: "debug", "info", "warn", "error".
+  // Rotation maps onto lumberjack's rotation knobs. Every field is optional; a
+  // zero value defers to lumberjack's default (max_size 100 MB; max_backups and
+  // max_age 0 retain everything; compress off). Applies only when output is
+  // "file".
+  message Rotation {
+    // Size in megabytes at which the file is rotated. Default 100.
+    int32 max_size = 1;
+    // Number of rotated files to retain. 0 retains all.
+    int32 max_backups = 2;
+    // Number of days to retain rotated files. 0 retains all.
+    int32 max_age = 3;
+    // Compress rotated files with gzip.
+    bool compress = 4;
+  }
+  // Minimum log level: "debug", "info", "warn", "error". Default "info".
   string level = 1;
-  // Output target: "stdout", "stderr", or "file".
+  // Output target: "stdout", "stderr", or "file". Default "stdout".
   string output = 2;
-  // File path when output is "file".
+  // File path when output is "file". Required in that case.
   string file_path = 3;
-  // Record encoding: "text" or "json". Default "text".
+  // Record encoding: "text", "json", or "color". "color" is a minimal,
+  // ANSI-colored single-line format for local development. Default "text".
   string format = 4;
+  // Include the source file:line in each record. Default false.
+  bool add_source = 5;
+  // Force color off even when format is "color" (e.g. CI). Otherwise color is
+  // auto-detected — disabled by NO_COLOR, TERM=dumb, or non-tty output.
+  bool no_color = 6;
+  // Size-based rotation of the log file. Applies only when output is "file".
+  Rotation rotation = 7;
 }
 
 // Registry configures the Nacos discovery backend the gateway resolves routes

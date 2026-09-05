@@ -2,7 +2,7 @@
 
 基于 [Kratos v3](https://go-kratos.dev) 的微服务 monorepo 模板：一个 HTTP 网关 + 一个用户中心服务模板 + 共享基础库（日志、Nacos、传输中间件套件、JWT 令牌引擎、ID 生成、雪花算法、API 文档）。
 
-存储层只保留 **ent**（schema 用 Go 写，客户端代码生成），默认 **MySQL**、两行配置即可切到 PostgreSQL（见 [docs/ent.md](docs/ent.md)）；日志统一用标准库 **log/slog**（Text/JSON + lumberjack 轮转）；服务注册 / 发现 / 配置中心统一由 **Nacos** 承担（kratos 生态中最主流、也是唯一同时提供注册与热更新配置的后端）；网关内建**限流 + 熔断**；HTTP 响应统一为 `code` / `message` / `data` **三字段信封**；API 文档由 buf 生成、`go:embed` 内嵌进二进制，服务自带 `/swagger`；分布式 ID 由 `pkg/snowflake` 就地生成。全部配置集中在根目录 `configs/`，本地中间件在 `deploy/`。
+存储层只保留 **ent**（schema 用 Go 写，客户端代码生成），默认 **MySQL**、两行配置即可切到 PostgreSQL（见 [docs/ent.md](docs/ent.md)）；日志统一用标准库 **log/slog**（Text/JSON/Color + lumberjack 轮转）；服务注册 / 发现 / 配置中心统一由 **Nacos** 承担（kratos 生态中最主流、也是唯一同时提供注册与热更新配置的后端）；网关内建**限流 + 熔断**；HTTP 响应统一为 `code` / `message` / `data` **三字段信封**；API 文档由 buf 生成、`go:embed` 内嵌进二进制，服务自带 `/swagger`；分布式 ID 由 `pkg/snowflake` 就地生成。全部配置集中在根目录 `configs/`，本地中间件在 `deploy/`。
 
 ## 架构
 
@@ -50,7 +50,7 @@ app/gateway/                 网关（无 biz/data，手工装配）
   internal/proxy/            服务发现 + selector 负载均衡 + 反向代理 + 每后端熔断
   internal/server/           监听器、CORS、边缘限流 filter、路由注册
 pkg/docs/                    API 文档：make api 按 domain 生成的 specs/<domain>/openapi.yaml（go:embed）+ /swagger UI
-pkg/log/                     日志构建：标准库 log/slog（Text/JSON）+ lumberjack 文件轮转
+pkg/log/                     日志构建：标准库 log/slog（Text/JSON/Color）+ lumberjack 文件轮转
 pkg/middleware/              可复用传输中间件：鉴权、编解码(信封+protojson)、日志、校验、限流
 pkg/jwt/                     HS256 令牌引擎（Manager/Claims）：签发与校验 access/refresh token
 pkg/idgen/                   ID 抽象：Generator 接口 + 雪花实现（int64 主键）
@@ -229,7 +229,7 @@ make config        # 各服务 internal/conf/v1 → *.pb.go
 | `data.database.auto_migrate` | 启动时 `Schema.Create` 建表；**生产关掉**，改用版本化迁移（[docs/ent.md](docs/ent.md)） |
 | `auth.jwt_secret` / `*_ttl` | JWT 密钥（用 `${AUTH_JWT_SECRET:...}` 注入）与 access/refresh token 有效期 |
 | `snowflake.node_id` | 本实例的雪花节点号，集群内必须唯一（`[0,1023]`） |
-| `log.level` / `output` / `format` | 日志级别、输出目标（stdout/stderr/file）与编码（text/json）；引擎固定为标准库 log/slog |
+| `log.level` / `output` / `format` / `file_path` / `add_source` / `no_color` / `rotation` | 日志级别（debug/info/warn/error）、输出目标（stdout/stderr/file）、编码（text/json/color）、文件路径、是否打印源码位置、强制关闭颜色，以及文件轮转（max_size/max_backups/max_age/compress）；引擎固定为标准库 log/slog |
 | `registry.address` | Nacos 服务器地址；留空则禁用注册/发现/远程配置（本地零依赖默认） |
 | `registry.namespace_id` / `group` | Nacos 命名空间与分组，留空即用 public / DEFAULT_GROUP |
 | `middleware.ratelimit` | 服务端限流：`enabled` / `type`(bbr\|token) / `qps` / `burst` |

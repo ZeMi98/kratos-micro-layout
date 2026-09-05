@@ -46,12 +46,20 @@ func init() {
 // newLogger builds the slog-backed logger from config. kratos context
 // handling and otel trace attrs are layered on top of it in main().
 func newLogger(c *conf.Log) (*slog.Logger, func(), error) {
+	rot := c.GetRotation()
 	return log.New(log.Options{
 		Level:     c.GetLevel(),
 		Format:    c.GetFormat(),
 		Output:    c.GetOutput(),
 		FilePath:  c.GetFilePath(),
-		AddSource: true,
+		AddSource: c.GetAddSource(),
+		NoColor:   c.GetNoColor(),
+		Rotation: log.RotationOptions{
+			MaxSize:    int(rot.GetMaxSize()),
+			MaxBackups: int(rot.GetMaxBackups()),
+			MaxAge:     int(rot.GetMaxAge()),
+			Compress:   rot.GetCompress(),
+		},
 	})
 }
 

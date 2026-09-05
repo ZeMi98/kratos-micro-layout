@@ -356,14 +356,22 @@ func (x *Cors) GetMaxAge() *durationpb.Duration {
 // Log configures the logging backend (standard library log/slog).
 type Log struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Minimum log level: "debug", "info", "warn", "error".
+	// Minimum log level: "debug", "info", "warn", "error". Default "info".
 	Level string `protobuf:"bytes,1,opt,name=level,proto3" json:"level,omitempty"`
-	// Output target: "stdout", "stderr", or "file".
+	// Output target: "stdout", "stderr", or "file". Default "stdout".
 	Output string `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"`
-	// File path when output is "file".
+	// File path when output is "file". Required in that case.
 	FilePath string `protobuf:"bytes,3,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
-	// Record encoding: "text" or "json". Default "text".
-	Format        string `protobuf:"bytes,4,opt,name=format,proto3" json:"format,omitempty"`
+	// Record encoding: "text", "json", or "color". "color" is a minimal,
+	// ANSI-colored single-line format for local development. Default "text".
+	Format string `protobuf:"bytes,4,opt,name=format,proto3" json:"format,omitempty"`
+	// Include the source file:line in each record. Default false.
+	AddSource bool `protobuf:"varint,5,opt,name=add_source,json=addSource,proto3" json:"add_source,omitempty"`
+	// Force color off even when format is "color" (e.g. CI). Otherwise color is
+	// auto-detected — disabled by NO_COLOR, TERM=dumb, or non-tty output.
+	NoColor bool `protobuf:"varint,6,opt,name=no_color,json=noColor,proto3" json:"no_color,omitempty"`
+	// Size-based rotation of the log file. Applies only when output is "file".
+	Rotation      *Log_Rotation `protobuf:"bytes,7,opt,name=rotation,proto3" json:"rotation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -424,6 +432,27 @@ func (x *Log) GetFormat() string {
 		return x.Format
 	}
 	return ""
+}
+
+func (x *Log) GetAddSource() bool {
+	if x != nil {
+		return x.AddSource
+	}
+	return false
+}
+
+func (x *Log) GetNoColor() bool {
+	if x != nil {
+		return x.NoColor
+	}
+	return false
+}
+
+func (x *Log) GetRotation() *Log_Rotation {
+	if x != nil {
+		return x.Rotation
+	}
+	return nil
 }
 
 // Registry configures the Nacos discovery backend the gateway resolves routes
@@ -791,6 +820,82 @@ func (x *Server_HTTP) GetTimeout() *durationpb.Duration {
 	return nil
 }
 
+// Rotation maps onto lumberjack's rotation knobs. Every field is optional; a
+// zero value defers to lumberjack's default (max_size 100 MB; max_backups and
+// max_age 0 retain everything; compress off). Applies only when output is
+// "file".
+type Log_Rotation struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Size in megabytes at which the file is rotated. Default 100.
+	MaxSize int32 `protobuf:"varint,1,opt,name=max_size,json=maxSize,proto3" json:"max_size,omitempty"`
+	// Number of rotated files to retain. 0 retains all.
+	MaxBackups int32 `protobuf:"varint,2,opt,name=max_backups,json=maxBackups,proto3" json:"max_backups,omitempty"`
+	// Number of days to retain rotated files. 0 retains all.
+	MaxAge int32 `protobuf:"varint,3,opt,name=max_age,json=maxAge,proto3" json:"max_age,omitempty"`
+	// Compress rotated files with gzip.
+	Compress      bool `protobuf:"varint,4,opt,name=compress,proto3" json:"compress,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Log_Rotation) Reset() {
+	*x = Log_Rotation{}
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Log_Rotation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Log_Rotation) ProtoMessage() {}
+
+func (x *Log_Rotation) ProtoReflect() protoreflect.Message {
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Log_Rotation.ProtoReflect.Descriptor instead.
+func (*Log_Rotation) Descriptor() ([]byte, []int) {
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{5, 0}
+}
+
+func (x *Log_Rotation) GetMaxSize() int32 {
+	if x != nil {
+		return x.MaxSize
+	}
+	return 0
+}
+
+func (x *Log_Rotation) GetMaxBackups() int32 {
+	if x != nil {
+		return x.MaxBackups
+	}
+	return 0
+}
+
+func (x *Log_Rotation) GetMaxAge() int32 {
+	if x != nil {
+		return x.MaxAge
+	}
+	return 0
+}
+
+func (x *Log_Rotation) GetCompress() bool {
+	if x != nil {
+		return x.Compress
+	}
+	return false
+}
+
 var File_gateway_internal_conf_v1_gateway_proto protoreflect.FileDescriptor
 
 const file_gateway_internal_conf_v1_gateway_proto_rawDesc = "" +
@@ -823,12 +928,22 @@ const file_gateway_internal_conf_v1_gateway_proto_rawDesc = "" +
 	"\rallow_methods\x18\x02 \x03(\tR\fallowMethods\x12#\n" +
 	"\rallow_headers\x18\x03 \x03(\tR\fallowHeaders\x12+\n" +
 	"\x11allow_credentials\x18\x04 \x01(\bR\x10allowCredentials\x122\n" +
-	"\amax_age\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x06maxAge\"h\n" +
+	"\amax_age\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x06maxAge\"\xe3\x02\n" +
 	"\x03Log\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\tR\x05level\x12\x16\n" +
 	"\x06output\x18\x02 \x01(\tR\x06output\x12\x1b\n" +
 	"\tfile_path\x18\x03 \x01(\tR\bfilePath\x12\x16\n" +
-	"\x06format\x18\x04 \x01(\tR\x06format\"\x95\x01\n" +
+	"\x06format\x18\x04 \x01(\tR\x06format\x12\x1d\n" +
+	"\n" +
+	"add_source\x18\x05 \x01(\bR\taddSource\x12\x19\n" +
+	"\bno_color\x18\x06 \x01(\bR\anoColor\x12B\n" +
+	"\brotation\x18\a \x01(\v2&.gateway.internal.conf.v1.Log.RotationR\brotation\x1a{\n" +
+	"\bRotation\x12\x19\n" +
+	"\bmax_size\x18\x01 \x01(\x05R\amaxSize\x12\x1f\n" +
+	"\vmax_backups\x18\x02 \x01(\x05R\n" +
+	"maxBackups\x12\x17\n" +
+	"\amax_age\x18\x03 \x01(\x05R\x06maxAge\x12\x1a\n" +
+	"\bcompress\x18\x04 \x01(\bR\bcompress\"\x95\x01\n" +
 	"\bRegistry\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12!\n" +
 	"\fnamespace_id\x18\x02 \x01(\tR\vnamespaceId\x12\x14\n" +
@@ -863,7 +978,7 @@ func file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_gateway_internal_conf_v1_gateway_proto_rawDescData
 }
 
-var file_gateway_internal_conf_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_gateway_internal_conf_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_gateway_internal_conf_v1_gateway_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: gateway.internal.conf.v1.Bootstrap
 	(*Server)(nil),              // 1: gateway.internal.conf.v1.Server
@@ -876,7 +991,8 @@ var file_gateway_internal_conf_v1_gateway_proto_goTypes = []any{
 	(*RateLimit)(nil),           // 8: gateway.internal.conf.v1.RateLimit
 	(*CircuitBreaker)(nil),      // 9: gateway.internal.conf.v1.CircuitBreaker
 	(*Server_HTTP)(nil),         // 10: gateway.internal.conf.v1.Server.HTTP
-	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
+	(*Log_Rotation)(nil),        // 11: gateway.internal.conf.v1.Log.Rotation
+	(*durationpb.Duration)(nil), // 12: google.protobuf.Duration
 }
 var file_gateway_internal_conf_v1_gateway_proto_depIdxs = []int32{
 	1,  // 0: gateway.internal.conf.v1.Bootstrap.server:type_name -> gateway.internal.conf.v1.Server
@@ -887,17 +1003,18 @@ var file_gateway_internal_conf_v1_gateway_proto_depIdxs = []int32{
 	10, // 5: gateway.internal.conf.v1.Server.http:type_name -> gateway.internal.conf.v1.Server.HTTP
 	3,  // 6: gateway.internal.conf.v1.Gateway.routes:type_name -> gateway.internal.conf.v1.Route
 	4,  // 7: gateway.internal.conf.v1.Gateway.cors:type_name -> gateway.internal.conf.v1.Cors
-	11, // 8: gateway.internal.conf.v1.Cors.max_age:type_name -> google.protobuf.Duration
-	8,  // 9: gateway.internal.conf.v1.Middleware.ratelimit:type_name -> gateway.internal.conf.v1.RateLimit
-	9,  // 10: gateway.internal.conf.v1.Middleware.circuit_breaker:type_name -> gateway.internal.conf.v1.CircuitBreaker
-	11, // 11: gateway.internal.conf.v1.CircuitBreaker.interval:type_name -> google.protobuf.Duration
-	11, // 12: gateway.internal.conf.v1.CircuitBreaker.timeout:type_name -> google.protobuf.Duration
-	11, // 13: gateway.internal.conf.v1.Server.HTTP.timeout:type_name -> google.protobuf.Duration
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	12, // 8: gateway.internal.conf.v1.Cors.max_age:type_name -> google.protobuf.Duration
+	11, // 9: gateway.internal.conf.v1.Log.rotation:type_name -> gateway.internal.conf.v1.Log.Rotation
+	8,  // 10: gateway.internal.conf.v1.Middleware.ratelimit:type_name -> gateway.internal.conf.v1.RateLimit
+	9,  // 11: gateway.internal.conf.v1.Middleware.circuit_breaker:type_name -> gateway.internal.conf.v1.CircuitBreaker
+	12, // 12: gateway.internal.conf.v1.CircuitBreaker.interval:type_name -> google.protobuf.Duration
+	12, // 13: gateway.internal.conf.v1.CircuitBreaker.timeout:type_name -> google.protobuf.Duration
+	12, // 14: gateway.internal.conf.v1.Server.HTTP.timeout:type_name -> google.protobuf.Duration
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_gateway_internal_conf_v1_gateway_proto_init() }
@@ -911,7 +1028,7 @@ func file_gateway_internal_conf_v1_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_internal_conf_v1_gateway_proto_rawDesc), len(file_gateway_internal_conf_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

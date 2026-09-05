@@ -11,8 +11,10 @@ import (
 )
 
 // RequestLogger returns a middleware that logs one line per RPC: transport kind,
-// operation, result code/reason and latency. Failures are logged at error level
-// with the message.
+// operation, result code/reason and latency. Severity tracks the outcome —
+// success at info, a 4xx (client fault) at warn, and a 5xx or unknown/unwrapped
+// error at error — so alerting can key on error level without firing on client
+// mistakes.
 //
 // Unlike the stock logging.Server middleware it deliberately omits the request
 // payload: services often carry credentials (Register / Login / ChangePassword),
@@ -44,12 +46,24 @@ func RequestLogger(logger *slog.Logger) middleware.Middleware {
 				slog.String("reason", reason),
 				slog.Float64("latency", time.Since(start).Seconds()),
 			}
+
+			level := slog.LevelInfo
+			switch {
+			case err == nil:
+				level = slog.LevelInfo
+			case code >= 500 || code == 0: // 0 usually means an unknown/unwrapped error; treat it as server-side too
+				level = slog.LevelError
+			default: // 4xx: a client-side problem, not a service fault
+				level = slog.LevelWarn
+			}
+
+			msg := "request"
 			if err != nil {
 				attrs = append(attrs, slog.String("error", message))
-				logger.LogAttrs(ctx, slog.LevelError, "request failed", attrs...)
-			} else {
-				logger.LogAttrs(ctx, slog.LevelInfo, "request", attrs...)
+				msg = "request failed"
 			}
+			logger.LogAttrs(ctx, level, msg, attrs...)
+
 			return reply, err
 		}
 	}
