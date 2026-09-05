@@ -430,15 +430,16 @@ const file_user_v1_user_proto_rawDesc = "" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tupdatedAt\"\x13\n" +
 	"\x11GetProfileRequest\"7\n" +
 	"\x12GetProfileResponse\x12!\n" +
-	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user\"\xbd\x02\n" +
+	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user\"\xdc\x03\n" +
 	"\x14UpdateProfileRequest\x12 \n" +
 	"\x05phone\x18\x01 \x01(\tB\n" +
 	"\xbaH\a\xd8\x01\x01r\x02\x18 R\x05phone\x12&\n" +
 	"\bnickname\x18\x02 \x01(\tB\n" +
 	"\xbaH\a\xd8\x01\x01r\x02\x18@R\bnickname\x12#\n" +
-	"\x06avatar\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\x80\x04R\x06avatar\x12\xb5\x01\n" +
-	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskBx\xe0A\x02\xbaHr\xba\x01l\n" +
-	"\x11update_mask.paths\x12@update_mask must select at least one of: phone, nickname, avatar\x1a\x15this.paths.size() > 0\xc8\x01\x01R\n" +
+	"\x06avatar\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\x80\x04R\x06avatar\x12\xd4\x02\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\x96\x02\xe0A\x02\xbaH\x8f\x02\xba\x01v\n" +
+	"\x1bupdate_mask.paths_not_empty\x12@update_mask must select at least one of: phone, nickname, avatar\x1a\x15this.paths.size() > 0\xba\x01\x8f\x01\n" +
+	"\x17update_mask.paths_valid\x12;update_mask.paths may only contain: phone, nickname, avatar\x1a7this.paths.all(p, p in ['phone', 'nickname', 'avatar'])\xc8\x01\x01R\n" +
 	"updateMask\":\n" +
 	"\x15UpdateProfileResponse\x12!\n" +
 	"\x04user\x18\x01 \x01(\v2\r.user.v1.UserR\x04user*t\n" +
