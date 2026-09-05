@@ -120,11 +120,18 @@ message UpdateProfileRequest {
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
       required: true
-      cel: {
-        id: "update_mask.paths"
-        message: "update_mask must select at least one of: phone, nickname, avatar"
-        expression: "this.paths.size() > 0"
-      }
+      cel: [
+        {
+          id: "update_mask.paths_not_empty"
+          message: "update_mask must select at least one of: phone, nickname, avatar"
+          expression: "this.paths.size() > 0"
+        },
+        {
+          id: "update_mask.paths_valid"
+          message: "update_mask.paths may only contain: phone, nickname, avatar"
+          expression: "this.paths.all(p, p in ['phone', 'nickname', 'avatar'])"
+        }
+      ]
     }
   ];
 }
