@@ -1,14 +1,27 @@
 version: v2
+# One template for the whole public-api surface: the Go/gRPC/kratos-HTTP stubs
+# AND the per-domain OpenAPI document. `make api` loops over api/<domain> and
+# runs this template with --path api/<domain>, so a single invocation
+# regenerates that domain's stubs and its own spec in lockstep.
+#
+# protoc-gen-openapi always writes the fixed name openapi.yaml into `out`, so
+# the Makefile stages it in .oapi/ (git-ignored) and moves it to
+# pkg/docs/specs/<domain>/openapi.yaml, where pkg/docs embeds it and
+# docs.Register(srv, "<domain>") serves it. Splitting the spec per domain is
+# what keeps a service's /swagger to the RPCs that service actually implements
+# — a single merged document would list every service's RPCs under every
+# service, and "try it out" would 404 on the ones it does not own.
+#
+# naming=proto and enum_type=string keep the spec faithful to what the service
+# actually sends: pkg/middleware/codec.go marshals with protojson UseProtoNames
+# (snake_case fields) and enums by name. The generator defaults (naming=json,
+# enum_type=integer) would document lowerCamelCase fields and numeric enums that
+# no client ever sees.
 inputs:
   - directory: api
 plugins:
-  # Go / gRPC / kratos-HTTP stubs for the whole api/ surface, emitted next to
-  # their .proto sources (paths=source_relative).
-  #
-  # The OpenAPI document is deliberately NOT generated here. It lives in
-  # buf.gen.openapi.yaml, which `make api` runs once per api/<domain> (passing
-  # --path) so every service ships its OWN spec instead of one merged document
-  # listing every service's RPCs. See pkg/docs for how they are embedded/served.
+  # Go / gRPC / kratos-HTTP stubs, emitted next to their .proto sources
+  # (paths=source_relative).
   - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]
     out: api
     opt: paths=source_relative
@@ -18,3 +31,17 @@ plugins:
   - local: ["go", "run", "github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v3@v3.0.0-20260526000039-30da04b769dc"]
     out: api
     opt: paths=source_relative
+  - local: ["go", "run", "github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.1"]
+    out: .oapi
+    strategy: all
+    # NOTE: buf splits each option on commas before handing it to the plugin,
+    # so title/description must stay comma-free or the remainder is parsed as
+    # bogus flags ("no such flag -message").
+    opt:
+      - "title=Kratos Micro Layout API"
+      - "description=HTTP API generated from api/**.proto. Bodies are protojson and every reply is wrapped in a code/message/data envelope."
+      - version=1.0.0
+      - naming=proto
+      - enum_type=string
+      - fq_schema_naming=true
+      - default_response=false

@@ -40,7 +40,7 @@
 api/user/v1/                 服务对外的 proto 契约（DTO）与生成代码
 app/user_center/             服务模板：用户中心（登录注册/鉴权/改密）
   cmd/user_center/           入口 + Wire 注入
-  internal/conf/             配置 proto（make config 生成）
+  internal/conf/v1/          配置 proto（make config 生成）
   internal/server/           HTTP/gRPC server 装配 + 鉴权 selector + 文档路由挂载
   internal/service/          DTO ↔ DO 转换层
   internal/biz/              领域模型、用例、Repo 接口、错误；JWT/ID 引擎的薄 conf provider
@@ -131,7 +131,7 @@ kratos new app/order --nomod -r https://github.com/ZeMi98/kratos-micro-sub-servi
 
 1. 全局替换模块路径中的 `user_center` → `order`（`go mod edit -module` 已由 `--nomod` 处理，主要是 import 路径）
 2. 重命名 `configs/user_center.yaml` → `configs/order.yaml`，并同步 `cmd/*/main.go` 里的 `nacosConfigDataID` 与 `-conf` 默认值
-3. 在 `buf.yaml` / `buf.gen.config.yaml` 中登记新模块路径
+3. 无需登记 buf：新服务的 conf proto 自动落入 `buf.yaml` 的 `app` 模块，`make config` 按 `app/*/internal/conf` 目录循环自动发现并生成
 4. 改 `internal/data/ent/generate.go` 里的 `Package`（ent 生成代码的 import path），详见 [docs/ent.md](docs/ent.md)
 
 ### 3. 起本地中间件
@@ -175,7 +175,9 @@ make middleware-up     # Nacos 同时承担注册中心与配置中心
 make run-user-center   # 服务注册为 user_center.http / user_center.grpc
 make run-gateway       # 网关监听 :8080，经 Nacos 发现后端
 
-curl localhost:8080/v1/users -H 'Origin: http://localhost:3000'   # 经网关 + CORS
+curl -X POST localhost:8080/v1/auth/login -H 'Content-Type: application/json' \
+  -H 'Origin: http://localhost:3000' -d '{"username":"alice","password":"secret123"}'
+#   经网关 + CORS；拿响应里的 access_token 再调 GET /v1/users/profile（Bearer 头）
 ```
 
 > `registry.address` 非空时，各服务同时拉取 Nacos 配置中心的同名 dataID（`<service>.yaml`）并热更新；留空时本地 yaml 即唯一配置来源。
@@ -185,7 +187,7 @@ curl localhost:8080/v1/users -H 'Origin: http://localhost:3000'   # 经网关 + 
 
 proto 依赖（`googleapis` 等）通过 [buf](https://buf.build) 管理，**没有 `third_party/` 目录**：
 
-- `buf.yaml` 声明 workspace 模块（`api`、各服务 `internal/conf`）与 BSR 依赖
+- `buf.yaml` 声明 workspace 模块（`api`、`app`）与 BSR 依赖；proto package 与相对模块根的目录严格一致（`user.v1`、`<service>.internal.conf.v1`），`buf lint` 跑默认规则、零豁免
 - `buf.lock` 锁定依赖版本
 - 依赖的 proto 只会被拉取到**本地缓存目录**，构建时从缓存读取：
   - Linux / macOS：`~/.cache/buf/v3`
@@ -196,13 +198,13 @@ make init          # 安装 buf 与 wire CLI
 buf dep update     # 按 buf.yaml 拉取/更新依赖（写入 buf.lock 与缓存）
 
 make api           # api/**.proto → go / grpc / http 桩 + pkg/docs/specs/<domain>/openapi.yaml（每 domain 一份）
-make config        # 各服务 internal/conf → *.pb.go
+make config        # 各服务 internal/conf/v1 → *.pb.go
 ```
 
-生成模板分四个文件：`buf.gen.yaml`（api 公共契约：go/grpc/http 桩）、`buf.gen.openapi.yaml`（按 domain 各产出一份 OpenAPI）、`buf.gen.config.yaml`（user_center 配置）、`buf.gen.gw.yaml`（gateway 配置）。
-注意 gateway 的配置 proto 使用独立 package `kratos.gateway`，避免与各服务模板的 `kratos.api` 包在同一次编译中冲突。
+生成模板分两个文件：`buf.gen.yaml`（api 公共契约：go/grpc/http 桩 + 按 domain 各一份的 OpenAPI）、`buf.gen.conf.yaml`（各服务配置，`make config` 按目录循环逐个 `--path` 生成）。
+每个服务的配置 proto 通过各自的 `--path` 单独生成；它们的 package 带服务名前缀（`user_center.internal.conf.v1`、`gateway.internal.conf.v1`），避免同名消息（Bootstrap、Server…）在同一次 workspace 编译中冲突。
 
-> `buf.gen.openapi.yaml` 里 OpenAPI 插件的 `opt` 值**不能含逗号** —— buf 会先按逗号拆分再传给插件，多出来的部分被当成未知 flag（`no such flag -message`）。
+> `buf.gen.yaml` 里 OpenAPI 插件的 `opt` 值**不能含逗号** —— buf 会先按逗号拆分再传给插件，多出来的部分被当成未知 flag（`no such flag -message`）。
 
 ## 配置说明
 
@@ -300,7 +302,7 @@ HTTP 额外用 `http.RequestDecoder/ResponseEncoder/ErrorEncoder` 挂 protojson 
 | `app/gateway/internal/proxy/handler.go` | 网关自身错误：无健康实例 / 熔断开路 `503`、后端不可达 `502` | 真实状态码 |
 
 > **为什么只有三个字段**：kratos 原生的 `reason`（错误枚举字符串）与 `code` 高度重复，`metadata` 只在需要回传结构化细节时才有用 —— 而 protovalidate 的失败信息已经拼进 `message`。字段越少，前后端约定越不容易漂移。
-> 需要机器可读的错误分类时，`reason` 仍然保留在**服务端**：`biz` 层用 `errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "user not found")` 构造错误，`RequestLogger` 会把 reason 打进日志，gRPC 侧也照常透传；只是不再出现在 HTTP body 里。要恢复给前端，给 `Envelope` 加回一个字段即可。
+> 需要机器可读的错误分类时，`reason` 仍然保留在**服务端**：`biz` 层用 `errors.NotFound(v1.ErrorReason_ERROR_REASON_USER_NOT_FOUND.String(), "user not found")` 构造错误，`RequestLogger` 会把 reason 打进日志，gRPC 侧也照常透传；只是不再出现在 HTTP body 里。要恢复给前端，给 `Envelope` 加回一个字段即可。
 
 实现在 `pkg/middleware/codec.go`（`ResponseEncoder`/`ErrorEncoder`）。想恢复语义化 HTTP 状态码，改 `writeEnvelope` 里的 `WriteHeader` 一行即可。**gRPC 不套信封**，沿用原生 status code。
 
@@ -320,34 +322,30 @@ HTTP 额外用 `http.RequestDecoder/ResponseEncoder/ErrorEncoder` 挂 protojson 
 
 校验规则用 [protovalidate](https://buf.build/docs/protovalidate) 直接写在 `.proto` 上（`buf.validate` 注解），运行时由 `validate.Validator` 中间件执行 —— **无需代码生成**，改完 proto 跑 `make api` 就生效，HTTP 与 gRPC 共用同一套规则不会漂移。
 
-**规则写在哪**：字段的 `[(buf.validate.field) = {...}]` 注解。`api/user/v1/auth.proto` 的实际写法：
+**规则写在哪**：字段的 `[(buf.validate.field) = {...}]` 注解。约束统一写成**带自定义失败描述的 CEL 规则**（`cel: {id, message, expression}`），客户端被拒时直接看到"该改什么"。`api/user/v1/auth.proto` 的实际写法：
 
 ```proto
 message RegisterRequest {
   string username = 1 [
     (google.api.field_behavior) = REQUIRED,      // 进 OpenAPI 文档的 required 标记
-    (buf.validate.field) = {                     // 真正在运行时执行的规则
-      required: true
-      string: {min_len: 3, max_len: 64}
+    (buf.validate.field).cel = {                 // 真正在运行时执行的规则
+      id: "username.length"
+      message: "username is required and must be between 3 and 64 characters"
+      expression: "this.size() >= 3 && this.size() <= 64"
     }
   ];
-  string email = 2 [(buf.validate.field) = {
-    required: true
-    string: {email: true, max_len: 255}
+  // 可选字段只约束形状；PATCH 复用的字段另加 ignore: IGNORE_IF_ZERO_VALUE（见 user.proto）
+  string nickname = 4 [(buf.validate.field).cel = {
+    id: "nickname.length"
+    message: "nickname must be at most 64 characters"
+    expression: "this.size() <= 64"
   }];
-  // 明文密码 8-72 字符：bcrypt 只吃前 72 字节，上限与之对齐
-  string password = 3 [(buf.validate.field) = {
-    required: true
-    string: {min_len: 8, max_len: 72}
-  }];
-  // 可选字段只约束形状，不写 required
-  string nickname = 4 [(buf.validate.field).string = {max_len: 64}];
 }
 ```
 
-`field_behavior` 与 `buf.validate` 是两件事：前者是**文档/契约**元数据（生成的 OpenAPI 会标 required），后者才是**运行时执行**的规则。只写 `field_behavior` 不会有任何校验效果。
+长度类 CEL 规则对空串同样失败，天然兼作 presence 检查，不必再叠 `required: true`（否则空值会报出两条违规）。`field_behavior` 与 `buf.validate` 是两件事：前者是**文档/契约**元数据（生成的 OpenAPI 会标 required），后者才是**运行时执行**的规则。只写 `field_behavior` 不会有任何校验效果。
 
-**谁来执行**：`pkg/middleware/validate.go` 的 `ProtoValidator` 调 `protovalidate.Validate(msg)`，被挂在中间件链**最内层**（紧贴 handler）：
+**谁来执行**：`pkg/middleware/validate.go` 的 `ProtoValidator` 调 `protovalidate.Validate(msg)`，把每条违规渲染成 `字段路径: 自定义描述` 并用 `; ` 拼成一行返回；kratos 的 `validate.Validator` 再把它包成 400 BadRequest 并盖上 `VALIDATOR` reason（信封本就不展示 reason）。这里刻意返回**普通** error 而不是 kratos error：`validate.Validator` 用的是 `err.Error()`，而 kratos error 的 `Error()` 是 `error: code = … reason = … message = …` 的完整格式串，包一层就会把这串噪声塞进客户端看到的 `message`。它被挂在中间件链**最内层**（紧贴 handler）：
 
 ```go
 validate.Validator(pkgmw.ProtoValidator)
@@ -355,7 +353,7 @@ validate.Validator(pkgmw.ProtoValidator)
 
 放在最内层的意义是：`recovery` 兜住校验器自身的 panic、`logging` 记下这次 400、`ratelimit` 先把洪峰削掉、`auth` 先确认调用者身份 —— 无效 token 的请求连校验都不会跑，返回 401 而不是 400。规则按消息类型编译一次并缓存，后续请求开销很小。
 
-**校验失败时客户端看到什么**：kratos 的 `validate.Validator` 把校验错误包成 `errors.BadRequest("VALIDATOR", err.Error())`，所以 HTTP 侧是 `code=400`，`message` 是 protovalidate 生成的**逐字段多行文本**：
+**校验失败时客户端看到什么**：一次请求会**收集全部**违规字段（不是遇到第一个就返回），HTTP 侧 `code=400`，`message` 是逐字段的自定义描述拼接：
 
 ```bash
 curl -X POST localhost:8000/v1/auth/register -H 'Content-Type: application/json' \
@@ -365,29 +363,32 @@ curl -X POST localhost:8000/v1/auth/register -H 'Content-Type: application/json'
 ```json
 {
   "code": 400,
-  "message": "validation errors:\n - username: must be at least 3 characters\n - email: must be a valid email address\n - password: must be at least 8 characters",
+  "message": "username: username is required and must be between 3 and 64 characters; email: email is required and must be a valid address, e.g. alice@example.com; password: password is required and must be between 8 and 72 characters",
   "data": null
 }
 ```
 
-一次请求会**收集全部**违规字段（不是遇到第一个就返回），前端可以一次性标红所有输入框。`message` 含 `\n`，展示时按需 split 或直接原样渲染。gRPC 侧同一份规则返回 `InvalidArgument`，message 完全一致。
+前端可以按 `; ` split 后一次性标红所有输入框。gRPC 侧同一份规则返回 `InvalidArgument`，message 完全一致。
 
-**常用规则速查**：
+**常用 CEL 写法速查**（都包在 `cel: {id, message, expression}` 里，`expression` 返回 `true` 表示通过）：
 
-| 场景 | 写法 |
+| 场景 | expression |
 |---|---|
-| 必填 | `required: true` |
-| 字符串长度 | `string: {min_len: 3, max_len: 32}` |
-| 邮箱 / URI / UUID | `string: {email: true}` / `{uri: true}` / `{uuid: true}` |
-| 枚举白名单 | `string: {in: ["a", "b"]}` |
-| 数值范围 | `int32: {gte: 0, lte: 100}` |
-| 正则 | `string: {pattern: "^[a-z]+$"}`（RE2，不支持反向引用） |
-| 时间戳 | `timestamp: {gte: {now: true}}` |
-| repeated | `repeated: {min_items: 1, max_items: 100, items: {string: {min_len: 1}}}` |
-| map | `map: {max_pairs: 10, values: {string: {max_len: 64}}}` |
-| 消息级（跨字段） | `option (buf.validate.message) = { ... }`，例如「start 必须早于 end」 |
+| 必填（字符串） | `this != ''` |
+| 字符串长度 | `this.size() >= 3 && this.size() <= 32`（对空串同样失败，兼作必填） |
+| 邮箱 | `this.matches('^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$')`（RE2，用 `[:space:]` 避免转义） |
+| 正则 | `this.matches('^[a-z]+$')`（RE2，不支持反向引用） |
+| 枚举白名单 | `this in ['a', 'b']` |
+| 数值范围 | `this >= 0 && this <= 100` |
+| repeated 非空 | `this.size() > 0` |
+| FieldMask 至少选一项 | `this.paths.size() > 0` |
+| 消息级（跨字段） | `option (buf.validate.message) = { cel: {...} }`，例如「start 必须早于 end」 |
 
-**PATCH 语义**：共享资源 `User` 的字段用 `ignore: IGNORE_IF_ZERO_VALUE` 而不是 `required`，这样 `UpdateUser` 局部更新时未传的零值字段不触发规则；创建路径的非空由 `biz` 层兜底（`ErrUserInvalidArgument`）。给新资源加规则时按 RPC 语义选：Create 用 `required`，共享消息用于 Update 时用 `ignore: IGNORE_IF_ZERO_VALUE`。
+标准规则（`string: {min_len: ...}`、`required: true` 等）依然可用，只是失败消息是 protovalidate 的英文模板；本模板约定统一写 CEL + `message`，让客户端直接看到"该改什么"。
+
+**PATCH 语义**：`UpdateProfileRequest` 的可更新字段（`phone` / `nickname` / `avatar`）标 `ignore: IGNORE_IF_ZERO_VALUE` —— 未被 mask 选中的字段是零值，直接跳过规则，长度约束只在客户端真的传了值时生效；`update_mask` 自身用 CEL 规则要求至少选中一个可更新字段。创建路径（`RegisterRequest`）则相反：长度规则对空串失败，天然必填。给新资源加规则时按 RPC 语义选：Create 直接写约束，Update/PATCH 请求的字段加 `ignore: IGNORE_IF_ZERO_VALUE`。
+
+注意校验层的"零值跳过"只管**规则**，不等于落库语义：`UpdateProfile` 把 mask 选中的字段集合一路传到 repo（`biz.UserField`），repo 只写这些列 —— 所以「选中 `nickname` 且值为空」是**清空昵称**，会真的写进库；未选中的列保持原值。若反过来靠"值非空才写"来推断意图，清空操作就会变成静默 no-op：接口返回 200，响应体却还是旧值。
 
 **边界在哪**：protovalidate 只管**请求形状**（格式、长度、范围、必填）。跨请求 / 需要查库的规则（用户名是否已存在、旧密码是否正确、状态机是否允许这次流转）属于领域规则，留在 `biz` 层，用 `errors.Conflict` / `errors.BadRequest` + `error_reason.proto` 的枚举抛出；`service` 层只做 DTO ↔ DO 转换，不写业务判断。
 
@@ -402,10 +403,10 @@ api/<domain>/**.proto ──make api──► pkg/docs/specs/<domain>/openapi.ya
                              GET /swagger/  (UI) ◄──────────────────────────────────────┘  (http-swagger + 内嵌静态资源)
 ```
 
-- **`make api` 按 domain 产出 spec**：`buf.gen.openapi.yaml` 里的 `protoc-gen-openapi` 对每个 `api/<domain>` 目录各跑一次（`--path api/<domain>`），产出 `pkg/docs/specs/<domain>/openapi.yaml` —— **一个 domain 一份**，而非把整个 `api/` 合并成单份。改 proto → `make api` → 文档自动跟上，**不可能与代码脱节**。
+- **`make api` 按 domain 产出 spec**：`buf.gen.yaml` 里的 `protoc-gen-openapi` 对每个 `api/<domain>` 目录各跑一次（`--path api/<domain>`，同一次调用顺带重生该 domain 的桩），产出 `pkg/docs/specs/<domain>/openapi.yaml` —— **一个 domain 一份**，而非把整个 `api/` 合并成单份。改 proto → `make api` → 文档自动跟上，**不可能与代码脱节**。
 - **每服务只显示自己的接口**：服务在 `http.go` 里用 `docs.Register(srv, "<domain>")` 指名托管自己实现的那份 spec，所以 `user_center` 的 `/swagger` 只列 `api/user` 的 RPC。若把所有 domain 合并成一份，每个服务的 `/swagger` 都会列出别家的接口，"Try it out" 打到本服务没有的路由只会 404。
 - **spec 与线上报文严格一致**：生成参数用 `naming=proto` + `enum_type=string`，正好对齐运行时的 protojson（snake_case 字段、枚举按名、int64 为字符串）。用默认 `naming=json` 生成会得到 camelCase 的假文档 —— 这是个很容易踩的坑。
-- **一处已知局限**：`protoc-gen-openapi` 会把 `google.api.field_behavior = REQUIRED` 翻译成 schema 的 `required` 列表，但**不会**把 `buf.validate` 的约束（`min_len` / `email` / `pattern`…）翻译成 `minLength` / `format` / `pattern`。也就是说文档里能看到"哪些字段必填、是什么类型"，看不到"长度和格式的具体门槛"—— 那部分以 `.proto` 为准，实际请求也会被服务端按规则拒绝（见「参数校验」）。
+- **一处已知局限**：`protoc-gen-openapi` 会把 `google.api.field_behavior = REQUIRED` 翻译成 schema 的 `required` 列表，但**不会**把 `buf.validate` 的约束（CEL 长度 / 格式 / 正则…）翻译成 `minLength` / `format` / `pattern`。也就是说文档里能看到"哪些字段必填、是什么类型"，看不到"长度和格式的具体门槛"—— 那部分以 `.proto` 为准，实际请求也会被服务端按规则拒绝（见「参数校验」）。
 - **`go:embed` 内嵌**：`pkg/docs/docs.go` 把 yaml 编进二进制，运行时不依赖文件系统，镜像里不必再 COPY 一份 spec。UI 的 css/js 同样内嵌在二进制里（`swaggo/files` 打包了官方 `swagger-ui-dist`），整个 `/swagger` 自包含。
 - **一行挂载**：`internal/server/http.go` 里一行 `docs.Register(srv, "user")` 就注册了两个路由（`"user"` 是本服务实现的 `api/<domain>` 目录名）。不想要文档的服务删掉这一行即可。
 
@@ -520,7 +521,7 @@ user.ID  = id.Int64()                       // 存入 BIGINT
 reply.Id = id.Int64()                       // DTO 字段声明为 int64，protojson 自动输出 JSON 字符串，JS 端不丢 2^53 精度
 ```
 
-> **user_center 已就地接入**：`pkg/idgen` 定义 `Generator` 接口 + 雪花实现，`internal/biz` 的 `NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`UserUsecase.CreateUser` 与 `AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent 主键是**不自增**的 BIGINT（`IDMixin` 用 `entsql.Annotation{Incremental: &false}` 关掉自增，否则数据库会和应用抢着发号）。
+> **user_center 已就地接入**：`pkg/idgen` 定义 `Generator` 接口 + 雪花实现，`internal/biz` 的 `NewIDGeneratorFromConf` 依据 `configs/user_center.yaml` 的 `snowflake.node_id` 构建节点；`AuthUsecase.Register` 在写库前为 `User.ID` 赋值。DTO（`api/user/v1`）的 `id`/`user_id` 声明为 `int64`，ent 主键是**不自增**的 BIGINT（`IDMixin` 用 `entsql.Annotation{Incremental: &false}` 关掉自增，否则数据库会和应用抢着发号）。
 
 ### 节点号分配策略
 
@@ -620,7 +621,7 @@ middleware:
 
 以新增 `order` 资源为例（单服务内）：
 
-1. **DTO**：在 `api/<domain>/v1/` 定义 proto（`<resource>.proto` + 扩充 `error_reason.proto`），字段用 `buf.validate` 声明校验规则，`make api`（顺带刷新 Swagger spec）
+1. **DTO**：在 `api/<domain>/v1/` 定义 proto（`<resource>.proto` + 扩充 `error_reason.proto`），每个 RPC 一对独立的 `<Rpc>Request`/`<Rpc>Response`（响应包装资源，如 `CreateOrderResponse{user}` 形态），字段用 `buf.validate` 声明校验规则，`make api`（顺带刷新 Swagger spec）；`buf lint` 默认规则必须零告警
 2. **DO**：`internal/biz/order.go` 定义 DO、`OrderRepo` 接口、`OrderUsecase`，错误用 `errors.NotFound/BadRequest` + error reason 枚举
 3. **PO**：`internal/data/ent/schema/order.go` 写 schema → `make ent` → `internal/data/ent/order_repo.go` 实现 `biz.OrderRepo`（含 `toBiz` 转换与错误映射），详见 [docs/ent.md](docs/ent.md)
 4. **service**：`internal/service/order.go` 做 DTO ↔ DO 转换；在 `internal/server` 注册 HTTP/gRPC service；若为受保护资源，在 `auth.go` 的 `authMiddleware` selector 里登记 `Prefix`
@@ -686,7 +687,7 @@ docker run -p 8080:8080 \
 |---|---|
 | `make init` | 安装 buf、wire CLI（代码生成工具）；不含子模块初始化 |
 | `make api` | `api/**.proto` → Go/gRPC/HTTP 桩 + `pkg/docs/specs/<domain>/openapi.yaml`（每 domain 一份） |
-| `make config` | 各服务 `internal/conf/*.proto` → `*.pb.go` |
+| `make config` | 各服务 `internal/conf/v1/*.proto` → `*.pb.go` |
 | `make ent` | 改 ent schema 后重新生成 ORM 代码 |
 | `make wire` | 改 ProviderSet / 构造函数签名后重新生成 `wire_gen.go` |
 | `make generate` | `ent` + `wire`（改完 biz/data 的常规收尾） |
@@ -697,6 +698,8 @@ docker run -p 8080:8080 \
 | `make middleware-search-up` | 额外起 Elasticsearch + Kibana（`search` profile） |
 | `make run-user-center` / `make run-gateway` | 本地运行服务 / 网关 |
 | `make tidy` | 在不破坏 workspace 的前提下清理 `go.mod` / `go.sum` |
+
+> 所有目标在 macOS/Linux（POSIX sh）与 Windows（原生 GNU make，配方经 cmd.exe 执行）下均可运行：文件操作只经 `$(MKDIR)`/`$(MOVE)`/`$(RM_RF)` 三个按 OS 分支的助手，迭代交给 make 自身（`$(wildcard)` + 子目标）而非 shell 循环。Windows 建议用 scoop/choco 安装 `make`（或 `mingw32-make`）；WSL 等同 Linux。
 
 > 生成的文件（`*.pb.go`、`*_grpc.pb.go`、`*_http.pb.go`、`wire_gen.go`、ent 生成代码、`specs/<domain>/openapi.yaml`）**都提交进仓库**，所以源文件改动与重生成结果属于同一个 commit；永远不要手改生成文件。
 

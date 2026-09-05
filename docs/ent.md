@@ -136,8 +136,20 @@ func toBiz(po *User) *biz.User {
 
 写方向 ent 用的是链式 `SetXxx`，不必再造 PO 结构，直接摊在 create 里即可。
 
-**2）查询组装。** 把 `biz.ListOptions`（filter / order_by / offset / limit）翻译成 ent 查询。
-AIP 表达式解析交给 `github.com/go-kratos/aip-go/ents`：
+**2）查询组装。** 读路径用链式查询组装，每条都要过滤掉软删除行：
+
+```go
+po, err := r.data.db.User.Query().
+	Where(user.IDEQ(id), user.StatusNEQ(biz.UserStatusDeleted)).
+	Only(ctx)
+```
+
+模板的 `UserService` 现在只有本人档案的读写（`GetProfile` / `UpdateProfile`），
+没有列表 RPC，`biz.ListOptions` 与 `github.com/go-kratos/aip-go/ents` 依赖也随
+`ListUsers` 一起删掉了。将来给资源加列表时，先在仓库根 `go get
+github.com/go-kratos/aip-go/ents`（不要在子模块里加），在 `biz` 重新定义
+`ListOptions`（filter / order_by / offset / limit），再把它们翻译成 ent 查询 ——
+AIP 表达式解析交给 `ents`：
 
 ```go
 query := r.data.db.User.Query().

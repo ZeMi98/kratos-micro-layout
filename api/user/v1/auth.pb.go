@@ -24,6 +24,12 @@ const (
 )
 
 // RegisterRequest is the request for Register.
+//
+// Field constraints are written as CEL rules with explicit `message` texts so
+// a rejected request tells the client exactly what to fix (the protovalidate
+// middleware surfaces them verbatim in a 400). Length rules double as presence
+// checks: a rule that fails on "" makes a separate `required` violation
+// redundant.
 type RegisterRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Login username. Must be unique.
@@ -105,8 +111,8 @@ func (x *RegisterRequest) GetPhone() string {
 	return ""
 }
 
-// RegisterReply is the response for Register.
-type RegisterReply struct {
+// RegisterResponse is the response for Register.
+type RegisterResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// ID of the newly created user (snowflake int64; JSON string via protojson).
 	UserId int64 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -118,20 +124,20 @@ type RegisterReply struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RegisterReply) Reset() {
-	*x = RegisterReply{}
+func (x *RegisterResponse) Reset() {
+	*x = RegisterResponse{}
 	mi := &file_user_v1_auth_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RegisterReply) String() string {
+func (x *RegisterResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegisterReply) ProtoMessage() {}
+func (*RegisterResponse) ProtoMessage() {}
 
-func (x *RegisterReply) ProtoReflect() protoreflect.Message {
+func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_user_v1_auth_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -143,26 +149,26 @@ func (x *RegisterReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterReply.ProtoReflect.Descriptor instead.
-func (*RegisterReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResponse) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RegisterReply) GetUserId() int64 {
+func (x *RegisterResponse) GetUserId() int64 {
 	if x != nil {
 		return x.UserId
 	}
 	return 0
 }
 
-func (x *RegisterReply) GetUsername() string {
+func (x *RegisterResponse) GetUsername() string {
 	if x != nil {
 		return x.Username
 	}
 	return ""
 }
 
-func (x *RegisterReply) GetEmail() string {
+func (x *RegisterResponse) GetEmail() string {
 	if x != nil {
 		return x.Email
 	}
@@ -297,8 +303,8 @@ func (x *TokenPair) GetTokenType() string {
 	return ""
 }
 
-// LoginReply is the response for Login.
-type LoginReply struct {
+// LoginResponse is the response for Login.
+type LoginResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Tokens *TokenPair             `protobuf:"bytes,1,opt,name=tokens,proto3" json:"tokens,omitempty"`
 	// User ID (snowflake int64; JSON string via protojson).
@@ -309,20 +315,20 @@ type LoginReply struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LoginReply) Reset() {
-	*x = LoginReply{}
+func (x *LoginResponse) Reset() {
+	*x = LoginResponse{}
 	mi := &file_user_v1_auth_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LoginReply) String() string {
+func (x *LoginResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LoginReply) ProtoMessage() {}
+func (*LoginResponse) ProtoMessage() {}
 
-func (x *LoginReply) ProtoReflect() protoreflect.Message {
+func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_user_v1_auth_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -334,26 +340,26 @@ func (x *LoginReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoginReply.ProtoReflect.Descriptor instead.
-func (*LoginReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
+func (*LoginResponse) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *LoginReply) GetTokens() *TokenPair {
+func (x *LoginResponse) GetTokens() *TokenPair {
 	if x != nil {
 		return x.Tokens
 	}
 	return nil
 }
 
-func (x *LoginReply) GetUserId() int64 {
+func (x *LoginResponse) GetUserId() int64 {
 	if x != nil {
 		return x.UserId
 	}
 	return 0
 }
 
-func (x *LoginReply) GetUsername() string {
+func (x *LoginResponse) GetUsername() string {
 	if x != nil {
 		return x.Username
 	}
@@ -407,27 +413,27 @@ func (x *LogoutRequest) GetAccessToken() string {
 	return ""
 }
 
-// LogoutReply is the response for Logout.
-type LogoutReply struct {
+// LogoutResponse is the response for Logout.
+type LogoutResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LogoutReply) Reset() {
-	*x = LogoutReply{}
+func (x *LogoutResponse) Reset() {
+	*x = LogoutResponse{}
 	mi := &file_user_v1_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LogoutReply) String() string {
+func (x *LogoutResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LogoutReply) ProtoMessage() {}
+func (*LogoutResponse) ProtoMessage() {}
 
-func (x *LogoutReply) ProtoReflect() protoreflect.Message {
+func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_user_v1_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -439,8 +445,8 @@ func (x *LogoutReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LogoutReply.ProtoReflect.Descriptor instead.
-func (*LogoutReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use LogoutResponse.ProtoReflect.Descriptor instead.
+func (*LogoutResponse) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{6}
 }
 
@@ -490,28 +496,28 @@ func (x *RefreshTokenRequest) GetRefreshToken() string {
 	return ""
 }
 
-// RefreshTokenReply is the response for RefreshToken.
-type RefreshTokenReply struct {
+// RefreshTokenResponse is the response for RefreshToken.
+type RefreshTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tokens        *TokenPair             `protobuf:"bytes,1,opt,name=tokens,proto3" json:"tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RefreshTokenReply) Reset() {
-	*x = RefreshTokenReply{}
+func (x *RefreshTokenResponse) Reset() {
+	*x = RefreshTokenResponse{}
 	mi := &file_user_v1_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RefreshTokenReply) String() string {
+func (x *RefreshTokenResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RefreshTokenReply) ProtoMessage() {}
+func (*RefreshTokenResponse) ProtoMessage() {}
 
-func (x *RefreshTokenReply) ProtoReflect() protoreflect.Message {
+func (x *RefreshTokenResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_user_v1_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -523,12 +529,12 @@ func (x *RefreshTokenReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RefreshTokenReply.ProtoReflect.Descriptor instead.
-func (*RefreshTokenReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use RefreshTokenResponse.ProtoReflect.Descriptor instead.
+func (*RefreshTokenResponse) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *RefreshTokenReply) GetTokens() *TokenPair {
+func (x *RefreshTokenResponse) GetTokens() *TokenPair {
 	if x != nil {
 		return x.Tokens
 	}
@@ -590,27 +596,27 @@ func (x *ChangePasswordRequest) GetNewPassword() string {
 	return ""
 }
 
-// ChangePasswordReply is the response for ChangePassword.
-type ChangePasswordReply struct {
+// ChangePasswordResponse is the response for ChangePassword.
+type ChangePasswordResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangePasswordReply) Reset() {
-	*x = ChangePasswordReply{}
+func (x *ChangePasswordResponse) Reset() {
+	*x = ChangePasswordResponse{}
 	mi := &file_user_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangePasswordReply) String() string {
+func (x *ChangePasswordResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangePasswordReply) ProtoMessage() {}
+func (*ChangePasswordResponse) ProtoMessage() {}
 
-func (x *ChangePasswordReply) ProtoReflect() protoreflect.Message {
+func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_user_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -622,8 +628,8 @@ func (x *ChangePasswordReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangePasswordReply.ProtoReflect.Descriptor instead.
-func (*ChangePasswordReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
+func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
 	return file_user_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
@@ -631,51 +637,64 @@ var File_user_v1_auth_proto protoreflect.FileDescriptor
 
 const file_user_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/auth.proto\x12\vapi.user.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\"\xd7\x01\n" +
-	"\x0fRegisterRequest\x12+\n" +
-	"\busername\x18\x01 \x01(\tB\x0f\xe0A\x02\xbaH\t\xc8\x01\x01r\x04\x10\x03\x18@R\busername\x12&\n" +
-	"\x05email\x18\x02 \x01(\tB\x10\xe0A\x02\xbaH\n" +
-	"\xc8\x01\x01r\x05\x18\xff\x01`\x01R\x05email\x12+\n" +
-	"\bpassword\x18\x03 \x01(\tB\x0f\xe0A\x02\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\bpassword\x12#\n" +
-	"\bnickname\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18@R\bnickname\x12\x1d\n" +
-	"\x05phone\x18\x05 \x01(\tB\a\xbaH\x04r\x02\x18 R\x05phone\"Z\n" +
-	"\rRegisterReply\x12\x17\n" +
+	"\x12user/v1/auth.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\"\xa8\x06\n" +
+	"\x0fRegisterRequest\x12\x9b\x01\n" +
+	"\busername\x18\x01 \x01(\tB\x7f\xe0A\x02\xbaHy\xba\x01v\n" +
+	"\x0fusername.length\x12<username is required and must be between 3 and 64 characters\x1a%this.size() >= 3 && this.size() <= 64R\busername\x12\x84\x02\n" +
+	"\x05email\x18\x02 \x01(\tB\xed\x01\xe0A\x02\xbaH\xe6\x01\xba\x01\x97\x01\n" +
+	"\femail.format\x12Eemail is required and must be a valid address, e.g. alice@example.com\x1a@this.matches('^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$')\xba\x01H\n" +
+	"\femail.length\x12$email must be at most 255 characters\x1a\x12this.size() <= 255R\x05email\x12\x9b\x01\n" +
+	"\bpassword\x18\x03 \x01(\tB\x7f\xe0A\x02\xbaHy\xba\x01v\n" +
+	"\x0fpassword.length\x12<password is required and must be between 8 and 72 characters\x1a%this.size() >= 8 && this.size() <= 72R\bpassword\x12n\n" +
+	"\bnickname\x18\x04 \x01(\tBR\xbaHO\xba\x01L\n" +
+	"\x0fnickname.length\x12&nickname must be at most 64 characters\x1a\x11this.size() <= 64R\bnickname\x12b\n" +
+	"\x05phone\x18\x05 \x01(\tBL\xbaHI\xba\x01F\n" +
+	"\fphone.length\x12#phone must be at most 32 characters\x1a\x11this.size() <= 32R\x05phone\"]\n" +
+	"\x10RegisterResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\"\\\n" +
-	"\fLoginRequest\x12%\n" +
-	"\busername\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\busername\x12%\n" +
-	"\bpassword\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\bpassword\"\x91\x01\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\"\xd2\x01\n" +
+	"\fLoginRequest\x12`\n" +
+	"\busername\x18\x01 \x01(\tBD\xe0A\x02\xbaH>\xba\x01;\n" +
+	"\x17login.username.required\x12\x14username is required\x1a\n" +
+	"this != ''R\busername\x12`\n" +
+	"\bpassword\x18\x02 \x01(\tBD\xe0A\x02\xbaH>\xba\x01;\n" +
+	"\x17login.password.required\x12\x14password is required\x1a\n" +
+	"this != ''R\bpassword\"\x91\x01\n" +
 	"\tTokenPair\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
 	"\n" +
 	"expires_in\x18\x03 \x01(\x03R\texpiresIn\x12\x1d\n" +
 	"\n" +
-	"token_type\x18\x04 \x01(\tR\ttokenType\"q\n" +
-	"\n" +
-	"LoginReply\x12.\n" +
-	"\x06tokens\x18\x01 \x01(\v2\x16.api.user.v1.TokenPairR\x06tokens\x12\x17\n" +
+	"token_type\x18\x04 \x01(\tR\ttokenType\"p\n" +
+	"\rLoginResponse\x12*\n" +
+	"\x06tokens\x18\x01 \x01(\v2\x12.user.v1.TokenPairR\x06tokens\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\"2\n" +
 	"\rLogoutRequest\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"\r\n" +
-	"\vLogoutReply\"E\n" +
-	"\x13RefreshTokenRequest\x12.\n" +
-	"\rrefresh_token\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\frefreshToken\"C\n" +
-	"\x11RefreshTokenReply\x12.\n" +
-	"\x06tokens\x18\x01 \x01(\v2\x16.api.user.v1.TokenPairR\x06tokens\"y\n" +
-	"\x15ChangePasswordRequest\x12,\n" +
-	"\fold_password\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\voldPassword\x122\n" +
-	"\fnew_password\x18\x02 \x01(\tB\x0f\xe0A\x02\xbaH\t\xc8\x01\x01r\x04\x10\b\x18HR\vnewPassword\"\x15\n" +
-	"\x13ChangePasswordReply2\x91\x04\n" +
-	"\vAuthService\x12b\n" +
-	"\bRegister\x12\x1c.api.user.v1.RegisterRequest\x1a\x1a.api.user.v1.RegisterReply\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12V\n" +
-	"\x05Login\x12\x19.api.user.v1.LoginRequest\x1a\x17.api.user.v1.LoginReply\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12Z\n" +
-	"\x06Logout\x12\x1a.api.user.v1.LogoutRequest\x1a\x18.api.user.v1.LogoutReply\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/logout\x12m\n" +
-	"\fRefreshToken\x12 .api.user.v1.RefreshTokenRequest\x1a\x1e.api.user.v1.RefreshTokenReply\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12{\n" +
-	"\x0eChangePassword\x12\".api.user.v1.ChangePasswordRequest\x1a .api.user.v1.ChangePasswordReply\"#\x82\xd3\xe4\x93\x02\x1d:\x01*\"\x18/v1/auth/change-passwordB3\n" +
-	"\vapi.user.v1P\x01Z\"kratos-micro-layout/api/user/v1;v1b\x06proto3"
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"\x10\n" +
+	"\x0eLogoutResponse\"\x84\x01\n" +
+	"\x13RefreshTokenRequest\x12m\n" +
+	"\rrefresh_token\x18\x01 \x01(\tBH\xe0A\x02\xbaHB\xba\x01?\n" +
+	"\x16refresh_token.required\x12\x19refresh_token is required\x1a\n" +
+	"this != ''R\frefreshToken\"B\n" +
+	"\x14RefreshTokenResponse\x12*\n" +
+	"\x06tokens\x18\x01 \x01(\v2\x12.user.v1.TokenPairR\x06tokens\"\xb1\x02\n" +
+	"\x15ChangePasswordRequest\x12i\n" +
+	"\fold_password\x18\x01 \x01(\tBF\xe0A\x02\xbaH@\xba\x01=\n" +
+	"\x15old_password.required\x12\x18old_password is required\x1a\n" +
+	"this != ''R\voldPassword\x12\xac\x01\n" +
+	"\fnew_password\x18\x02 \x01(\tB\x88\x01\xe0A\x02\xbaH\x81\x01\xba\x01~\n" +
+	"\x13new_password.length\x12@new_password is required and must be between 8 and 72 characters\x1a%this.size() >= 8 && this.size() <= 72R\vnewPassword\"\x18\n" +
+	"\x16ChangePasswordResponse2\xf8\x03\n" +
+	"\vAuthService\x12]\n" +
+	"\bRegister\x12\x18.user.v1.RegisterRequest\x1a\x19.user.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12Q\n" +
+	"\x05Login\x12\x15.user.v1.LoginRequest\x1a\x16.user.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12U\n" +
+	"\x06Logout\x12\x16.user.v1.LogoutRequest\x1a\x17.user.v1.LogoutResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/logout\x12h\n" +
+	"\fRefreshToken\x12\x1c.user.v1.RefreshTokenRequest\x1a\x1d.user.v1.RefreshTokenResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12v\n" +
+	"\x0eChangePassword\x12\x1e.user.v1.ChangePasswordRequest\x1a\x1f.user.v1.ChangePasswordResponse\"#\x82\xd3\xe4\x93\x02\x1d:\x01*\"\x18/v1/auth/change-passwordB/\n" +
+	"\auser.v1P\x01Z\"kratos-micro-layout/api/user/v1;v1b\x06proto3"
 
 var (
 	file_user_v1_auth_proto_rawDescOnce sync.Once
@@ -691,31 +710,31 @@ func file_user_v1_auth_proto_rawDescGZIP() []byte {
 
 var file_user_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_user_v1_auth_proto_goTypes = []any{
-	(*RegisterRequest)(nil),       // 0: api.user.v1.RegisterRequest
-	(*RegisterReply)(nil),         // 1: api.user.v1.RegisterReply
-	(*LoginRequest)(nil),          // 2: api.user.v1.LoginRequest
-	(*TokenPair)(nil),             // 3: api.user.v1.TokenPair
-	(*LoginReply)(nil),            // 4: api.user.v1.LoginReply
-	(*LogoutRequest)(nil),         // 5: api.user.v1.LogoutRequest
-	(*LogoutReply)(nil),           // 6: api.user.v1.LogoutReply
-	(*RefreshTokenRequest)(nil),   // 7: api.user.v1.RefreshTokenRequest
-	(*RefreshTokenReply)(nil),     // 8: api.user.v1.RefreshTokenReply
-	(*ChangePasswordRequest)(nil), // 9: api.user.v1.ChangePasswordRequest
-	(*ChangePasswordReply)(nil),   // 10: api.user.v1.ChangePasswordReply
+	(*RegisterRequest)(nil),        // 0: user.v1.RegisterRequest
+	(*RegisterResponse)(nil),       // 1: user.v1.RegisterResponse
+	(*LoginRequest)(nil),           // 2: user.v1.LoginRequest
+	(*TokenPair)(nil),              // 3: user.v1.TokenPair
+	(*LoginResponse)(nil),          // 4: user.v1.LoginResponse
+	(*LogoutRequest)(nil),          // 5: user.v1.LogoutRequest
+	(*LogoutResponse)(nil),         // 6: user.v1.LogoutResponse
+	(*RefreshTokenRequest)(nil),    // 7: user.v1.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),   // 8: user.v1.RefreshTokenResponse
+	(*ChangePasswordRequest)(nil),  // 9: user.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil), // 10: user.v1.ChangePasswordResponse
 }
 var file_user_v1_auth_proto_depIdxs = []int32{
-	3,  // 0: api.user.v1.LoginReply.tokens:type_name -> api.user.v1.TokenPair
-	3,  // 1: api.user.v1.RefreshTokenReply.tokens:type_name -> api.user.v1.TokenPair
-	0,  // 2: api.user.v1.AuthService.Register:input_type -> api.user.v1.RegisterRequest
-	2,  // 3: api.user.v1.AuthService.Login:input_type -> api.user.v1.LoginRequest
-	5,  // 4: api.user.v1.AuthService.Logout:input_type -> api.user.v1.LogoutRequest
-	7,  // 5: api.user.v1.AuthService.RefreshToken:input_type -> api.user.v1.RefreshTokenRequest
-	9,  // 6: api.user.v1.AuthService.ChangePassword:input_type -> api.user.v1.ChangePasswordRequest
-	1,  // 7: api.user.v1.AuthService.Register:output_type -> api.user.v1.RegisterReply
-	4,  // 8: api.user.v1.AuthService.Login:output_type -> api.user.v1.LoginReply
-	6,  // 9: api.user.v1.AuthService.Logout:output_type -> api.user.v1.LogoutReply
-	8,  // 10: api.user.v1.AuthService.RefreshToken:output_type -> api.user.v1.RefreshTokenReply
-	10, // 11: api.user.v1.AuthService.ChangePassword:output_type -> api.user.v1.ChangePasswordReply
+	3,  // 0: user.v1.LoginResponse.tokens:type_name -> user.v1.TokenPair
+	3,  // 1: user.v1.RefreshTokenResponse.tokens:type_name -> user.v1.TokenPair
+	0,  // 2: user.v1.AuthService.Register:input_type -> user.v1.RegisterRequest
+	2,  // 3: user.v1.AuthService.Login:input_type -> user.v1.LoginRequest
+	5,  // 4: user.v1.AuthService.Logout:input_type -> user.v1.LogoutRequest
+	7,  // 5: user.v1.AuthService.RefreshToken:input_type -> user.v1.RefreshTokenRequest
+	9,  // 6: user.v1.AuthService.ChangePassword:input_type -> user.v1.ChangePasswordRequest
+	1,  // 7: user.v1.AuthService.Register:output_type -> user.v1.RegisterResponse
+	4,  // 8: user.v1.AuthService.Login:output_type -> user.v1.LoginResponse
+	6,  // 9: user.v1.AuthService.Logout:output_type -> user.v1.LogoutResponse
+	8,  // 10: user.v1.AuthService.RefreshToken:output_type -> user.v1.RefreshTokenResponse
+	10, // 11: user.v1.AuthService.ChangePassword:output_type -> user.v1.ChangePasswordResponse
 	7,  // [7:12] is the sub-list for method output_type
 	2,  // [2:7] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name

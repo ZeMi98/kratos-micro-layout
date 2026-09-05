@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"kratos-micro-layout/app/gateway/internal/conf"
+	"kratos-micro-layout/app/gateway/internal/conf/v1"
 	"kratos-micro-layout/app/gateway/internal/server"
 	"kratos-micro-layout/pkg/log"
 	"kratos-micro-layout/pkg/nacos"

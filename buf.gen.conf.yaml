@@ -1,0 +1,11 @@
+version: v2
+# Config stubs for every service. `make config` loops over the
+# app/*/internal/conf directories and runs this template with --path <dir>, so
+# each service's conf protos compile in their own scope and a new service needs
+# no registration here. Sources are relative to the app/ module root, so out is
+# app/ and the stubs land next to their .proto sources in internal/conf/v1/
+# (paths=source_relative).
+plugins:
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]
+    out: app
+    opt: paths=source_relative

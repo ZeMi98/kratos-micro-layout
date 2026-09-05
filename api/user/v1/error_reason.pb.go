@@ -24,51 +24,52 @@ const (
 // ErrorReason enumerates all user-domain error codes.
 //
 // The values double as the kratos error `reason` string (see internal/biz),
-// so they stay short and unprefixed: "USER_NOT_FOUND", not
-// "ERROR_REASON_USER_NOT_FOUND". Renaming a value here is a breaking API change
-// and requires `make api` plus an update of every biz call site.
+// and carry the buf-mandated ERROR_REASON_ prefix (lint ENUM_VALUE_PREFIX),
+// so the wire reason reads e.g. "ERROR_REASON_USER_NOT_FOUND". Renaming a
+// value here is a breaking API change and requires `make api` plus an update
+// of every biz call site.
 type ErrorReason int32
 
 const (
 	// Default unspecified error.
 	ErrorReason_ERROR_REASON_UNSPECIFIED ErrorReason = 0
 	// The requested user was not found.
-	ErrorReason_USER_NOT_FOUND ErrorReason = 1
+	ErrorReason_ERROR_REASON_USER_NOT_FOUND ErrorReason = 1
 	// A user with the same username or email already exists.
-	ErrorReason_USER_ALREADY_EXISTS ErrorReason = 2
+	ErrorReason_ERROR_REASON_USER_ALREADY_EXISTS ErrorReason = 2
 	// The request contains invalid arguments.
-	ErrorReason_USER_INVALID_ARGUMENT ErrorReason = 3
+	ErrorReason_ERROR_REASON_USER_INVALID_ARGUMENT ErrorReason = 3
 	// The supplied credentials are invalid.
-	ErrorReason_AUTH_INVALID_CREDENTIALS ErrorReason = 4
+	ErrorReason_ERROR_REASON_AUTH_INVALID_CREDENTIALS ErrorReason = 4
 	// The access or refresh token has expired.
-	ErrorReason_AUTH_TOKEN_EXPIRED ErrorReason = 5
+	ErrorReason_ERROR_REASON_AUTH_TOKEN_EXPIRED ErrorReason = 5
 	// The token is malformed or tampered with.
-	ErrorReason_AUTH_TOKEN_INVALID ErrorReason = 6
+	ErrorReason_ERROR_REASON_AUTH_TOKEN_INVALID ErrorReason = 6
 	// The request is not authenticated.
-	ErrorReason_AUTH_UNAUTHORIZED ErrorReason = 7
+	ErrorReason_ERROR_REASON_AUTH_UNAUTHORIZED ErrorReason = 7
 )
 
 // Enum value maps for ErrorReason.
 var (
 	ErrorReason_name = map[int32]string{
 		0: "ERROR_REASON_UNSPECIFIED",
-		1: "USER_NOT_FOUND",
-		2: "USER_ALREADY_EXISTS",
-		3: "USER_INVALID_ARGUMENT",
-		4: "AUTH_INVALID_CREDENTIALS",
-		5: "AUTH_TOKEN_EXPIRED",
-		6: "AUTH_TOKEN_INVALID",
-		7: "AUTH_UNAUTHORIZED",
+		1: "ERROR_REASON_USER_NOT_FOUND",
+		2: "ERROR_REASON_USER_ALREADY_EXISTS",
+		3: "ERROR_REASON_USER_INVALID_ARGUMENT",
+		4: "ERROR_REASON_AUTH_INVALID_CREDENTIALS",
+		5: "ERROR_REASON_AUTH_TOKEN_EXPIRED",
+		6: "ERROR_REASON_AUTH_TOKEN_INVALID",
+		7: "ERROR_REASON_AUTH_UNAUTHORIZED",
 	}
 	ErrorReason_value = map[string]int32{
-		"ERROR_REASON_UNSPECIFIED": 0,
-		"USER_NOT_FOUND":           1,
-		"USER_ALREADY_EXISTS":      2,
-		"USER_INVALID_ARGUMENT":    3,
-		"AUTH_INVALID_CREDENTIALS": 4,
-		"AUTH_TOKEN_EXPIRED":       5,
-		"AUTH_TOKEN_INVALID":       6,
-		"AUTH_UNAUTHORIZED":        7,
+		"ERROR_REASON_UNSPECIFIED":              0,
+		"ERROR_REASON_USER_NOT_FOUND":           1,
+		"ERROR_REASON_USER_ALREADY_EXISTS":      2,
+		"ERROR_REASON_USER_INVALID_ARGUMENT":    3,
+		"ERROR_REASON_AUTH_INVALID_CREDENTIALS": 4,
+		"ERROR_REASON_AUTH_TOKEN_EXPIRED":       5,
+		"ERROR_REASON_AUTH_TOKEN_INVALID":       6,
+		"ERROR_REASON_AUTH_UNAUTHORIZED":        7,
 	}
 )
 
@@ -103,17 +104,17 @@ var File_user_v1_error_reason_proto protoreflect.FileDescriptor
 
 const file_user_v1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"\x1auser/v1/error_reason.proto\x12\vapi.user.v1*\xd8\x01\n" +
+	"\x1auser/v1/error_reason.proto\x12\auser.v1*\xb3\x02\n" +
 	"\vErrorReason\x12\x1c\n" +
-	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x12\n" +
-	"\x0eUSER_NOT_FOUND\x10\x01\x12\x17\n" +
-	"\x13USER_ALREADY_EXISTS\x10\x02\x12\x19\n" +
-	"\x15USER_INVALID_ARGUMENT\x10\x03\x12\x1c\n" +
-	"\x18AUTH_INVALID_CREDENTIALS\x10\x04\x12\x16\n" +
-	"\x12AUTH_TOKEN_EXPIRED\x10\x05\x12\x16\n" +
-	"\x12AUTH_TOKEN_INVALID\x10\x06\x12\x15\n" +
-	"\x11AUTH_UNAUTHORIZED\x10\aB3\n" +
-	"\vapi.user.v1P\x01Z\"kratos-micro-layout/api/user/v1;v1b\x06proto3"
+	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bERROR_REASON_USER_NOT_FOUND\x10\x01\x12$\n" +
+	" ERROR_REASON_USER_ALREADY_EXISTS\x10\x02\x12&\n" +
+	"\"ERROR_REASON_USER_INVALID_ARGUMENT\x10\x03\x12)\n" +
+	"%ERROR_REASON_AUTH_INVALID_CREDENTIALS\x10\x04\x12#\n" +
+	"\x1fERROR_REASON_AUTH_TOKEN_EXPIRED\x10\x05\x12#\n" +
+	"\x1fERROR_REASON_AUTH_TOKEN_INVALID\x10\x06\x12\"\n" +
+	"\x1eERROR_REASON_AUTH_UNAUTHORIZED\x10\aB/\n" +
+	"\auser.v1P\x01Z\"kratos-micro-layout/api/user/v1;v1b\x06proto3"
 
 var (
 	file_user_v1_error_reason_proto_rawDescOnce sync.Once
@@ -129,7 +130,7 @@ func file_user_v1_error_reason_proto_rawDescGZIP() []byte {
 
 var file_user_v1_error_reason_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_user_v1_error_reason_proto_goTypes = []any{
-	(ErrorReason)(0), // 0: api.user.v1.ErrorReason
+	(ErrorReason)(0), // 0: user.v1.ErrorReason
 }
 var file_user_v1_error_reason_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type

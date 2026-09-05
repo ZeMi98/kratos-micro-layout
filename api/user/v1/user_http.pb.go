@@ -17,155 +17,67 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
-const OperationUserServiceCreateUser = "/api.user.v1.UserService/CreateUser"
-const OperationUserServiceDeleteUser = "/api.user.v1.UserService/DeleteUser"
-const OperationUserServiceGetUser = "/api.user.v1.UserService/GetUser"
-const OperationUserServiceListUsers = "/api.user.v1.UserService/ListUsers"
-const OperationUserServiceUpdateUser = "/api.user.v1.UserService/UpdateUser"
+const OperationUserServiceGetProfile = "/user.v1.UserService/GetProfile"
+const OperationUserServiceUpdateProfile = "/user.v1.UserService/UpdateProfile"
 
 type UserServiceHTTPServer interface {
-	// CreateUser CreateUser creates a new user account.
-	CreateUser(context.Context, *CreateUserRequest) (*User, error)
-	// DeleteUser DeleteUser soft-deletes a user account.
-	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserReply, error)
-	// GetUser GetUser returns a user by ID.
-	GetUser(context.Context, *GetUserRequest) (*User, error)
-	// ListUsers ListUsers lists user accounts with filtering, ordering, and pagination.
-	ListUsers(context.Context, *ListUsersRequest) (*ListUsersReply, error)
-	// UpdateUser UpdateUser patches a user account.
-	UpdateUser(context.Context, *UpdateUserRequest) (*User, error)
+	// GetProfile GetProfile returns the caller's own account.
+	GetProfile(context.Context, *GetProfileRequest) (*GetProfileResponse, error)
+	// UpdateProfile UpdateProfile patches the caller's own profile fields. Identity fields
+	// (username, email) and server-assigned fields are not patchable here.
+	UpdateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error)
 }
 
 func RegisterUserServiceHTTPServer(s *http.Server, srv UserServiceHTTPServer) {
 	r := s.Route("/")
-	r.Handle("POST", "/v1/users", _UserService_CreateUser0_HTTP_Handler(srv))
-	r.Handle("GET", "/v1/users/{id}", _UserService_GetUser0_HTTP_Handler(srv))
-	r.Handle("GET", "/v1/users", _UserService_ListUsers0_HTTP_Handler(srv))
-	r.Handle("PATCH", "/v1/users/{user.id}", _UserService_UpdateUser0_HTTP_Handler(srv))
-	r.Handle("DELETE", "/v1/users/{id}", _UserService_DeleteUser0_HTTP_Handler(srv))
+	r.Handle("GET", "/v1/users/profile", _UserService_GetProfile0_HTTP_Handler(srv))
+	r.Handle("PATCH", "/v1/users/profile", _UserService_UpdateProfile0_HTTP_Handler(srv))
 }
 
-func _UserService_CreateUser0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
+func _UserService_GetProfile0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in CreateUserRequest
-		if err := ctx.Bind(&in.User); err != nil {
-			return err
-		}
+		var in GetProfileRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationUserServiceCreateUser)
+		http.SetOperation(ctx, OperationUserServiceGetProfile)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.CreateUser(ctx, req.(*CreateUserRequest))
+			return srv.GetProfile(ctx, req.(*GetProfileRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*User)
+		reply := out.(*GetProfileResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
-func _UserService_GetUser0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
+func _UserService_UpdateProfile0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in GetUserRequest
-		if err := ctx.BindQuery(&in); err != nil {
+		var in UpdateProfileRequest
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
-		if err := ctx.BindVars(&in); err != nil {
-			return err
-		}
-		http.SetOperation(ctx, OperationUserServiceGetUser)
+		http.SetOperation(ctx, OperationUserServiceUpdateProfile)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.GetUser(ctx, req.(*GetUserRequest))
+			return srv.UpdateProfile(ctx, req.(*UpdateProfileRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*User)
-		return ctx.Result(200, reply)
-	}
-}
-
-func _UserService_ListUsers0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
-	return func(ctx http.Context) error {
-		var in ListUsersRequest
-		if err := ctx.BindQuery(&in); err != nil {
-			return err
-		}
-		http.SetOperation(ctx, OperationUserServiceListUsers)
-		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.ListUsers(ctx, req.(*ListUsersRequest))
-		})
-		out, err := h(ctx, &in)
-		if err != nil {
-			return err
-		}
-		reply := out.(*ListUsersReply)
-		return ctx.Result(200, reply)
-	}
-}
-
-func _UserService_UpdateUser0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
-	return func(ctx http.Context) error {
-		var in UpdateUserRequest
-		if err := ctx.Bind(&in.User); err != nil {
-			return err
-		}
-		if err := ctx.BindQuery(&in); err != nil {
-			return err
-		}
-		if err := ctx.BindVars(&in); err != nil {
-			return err
-		}
-		http.SetOperation(ctx, OperationUserServiceUpdateUser)
-		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.UpdateUser(ctx, req.(*UpdateUserRequest))
-		})
-		out, err := h(ctx, &in)
-		if err != nil {
-			return err
-		}
-		reply := out.(*User)
-		return ctx.Result(200, reply)
-	}
-}
-
-func _UserService_DeleteUser0_HTTP_Handler(srv UserServiceHTTPServer) func(ctx http.Context) error {
-	return func(ctx http.Context) error {
-		var in DeleteUserRequest
-		if err := ctx.BindQuery(&in); err != nil {
-			return err
-		}
-		if err := ctx.BindVars(&in); err != nil {
-			return err
-		}
-		http.SetOperation(ctx, OperationUserServiceDeleteUser)
-		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.DeleteUser(ctx, req.(*DeleteUserRequest))
-		})
-		out, err := h(ctx, &in)
-		if err != nil {
-			return err
-		}
-		reply := out.(*DeleteUserReply)
+		reply := out.(*UpdateProfileResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 type UserServiceHTTPClient interface {
-	// CreateUser CreateUser creates a new user account.
-	CreateUser(ctx context.Context, req *CreateUserRequest, opts ...http.CallOption) (rsp *User, err error)
-	// DeleteUser DeleteUser soft-deletes a user account.
-	DeleteUser(ctx context.Context, req *DeleteUserRequest, opts ...http.CallOption) (rsp *DeleteUserReply, err error)
-	// GetUser GetUser returns a user by ID.
-	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *User, err error)
-	// ListUsers ListUsers lists user accounts with filtering, ordering, and pagination.
-	ListUsers(ctx context.Context, req *ListUsersRequest, opts ...http.CallOption) (rsp *ListUsersReply, err error)
-	// UpdateUser UpdateUser patches a user account.
-	UpdateUser(ctx context.Context, req *UpdateUserRequest, opts ...http.CallOption) (rsp *User, err error)
+	// GetProfile GetProfile returns the caller's own account.
+	GetProfile(ctx context.Context, req *GetProfileRequest, opts ...http.CallOption) (rsp *GetProfileResponse, err error)
+	// UpdateProfile UpdateProfile patches the caller's own profile fields. Identity fields
+	// (username, email) and server-assigned fields are not patchable here.
+	UpdateProfile(ctx context.Context, req *UpdateProfileRequest, opts ...http.CallOption) (rsp *UpdateProfileResponse, err error)
 }
 
 type UserServiceHTTPClientImpl struct {
@@ -176,49 +88,14 @@ func NewUserServiceHTTPClient(client *http.Client) UserServiceHTTPClient {
 	return &UserServiceHTTPClientImpl{client}
 }
 
-// CreateUser CreateUser creates a new user account.
-func (c *UserServiceHTTPClientImpl) CreateUser(ctx context.Context, in *CreateUserRequest, opts ...http.CallOption) (*User, error) {
-	var out User
-	pattern := "/v1/users"
-	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("user"))
-	opts = append([]http.CallOption{
-		http.Accept("application/protojson"),
-		http.ContentType("application/protojson"),
-		http.Operation(OperationUserServiceCreateUser),
-		http.PathTemplate(pattern),
-	}, opts...)
-	err := c.cc.Invoke(ctx, "POST", path, in.User, &out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// DeleteUser DeleteUser soft-deletes a user account.
-func (c *UserServiceHTTPClientImpl) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...http.CallOption) (*DeleteUserReply, error) {
-	var out DeleteUserReply
-	pattern := "/v1/users/{id}"
+// GetProfile GetProfile returns the caller's own account.
+func (c *UserServiceHTTPClientImpl) GetProfile(ctx context.Context, in *GetProfileRequest, opts ...http.CallOption) (*GetProfileResponse, error) {
+	var out GetProfileResponse
+	pattern := "/v1/users/profile"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
-		http.Operation(OperationUserServiceDeleteUser),
-		http.PathTemplate(pattern),
-	}, opts...)
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// GetUser GetUser returns a user by ID.
-func (c *UserServiceHTTPClientImpl) GetUser(ctx context.Context, in *GetUserRequest, opts ...http.CallOption) (*User, error) {
-	var out User
-	pattern := "/v1/users/{id}"
-	path := http.BuildPath(pattern, in, http.WithQueryParams())
-	opts = append([]http.CallOption{
-		http.Accept("application/protojson"),
-		http.Operation(OperationUserServiceGetUser),
+		http.Operation(OperationUserServiceGetProfile),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
@@ -228,35 +105,19 @@ func (c *UserServiceHTTPClientImpl) GetUser(ctx context.Context, in *GetUserRequ
 	return &out, nil
 }
 
-// ListUsers ListUsers lists user accounts with filtering, ordering, and pagination.
-func (c *UserServiceHTTPClientImpl) ListUsers(ctx context.Context, in *ListUsersRequest, opts ...http.CallOption) (*ListUsersReply, error) {
-	var out ListUsersReply
-	pattern := "/v1/users"
-	path := http.BuildPath(pattern, in, http.WithQueryParams())
-	opts = append([]http.CallOption{
-		http.Accept("application/protojson"),
-		http.Operation(OperationUserServiceListUsers),
-		http.PathTemplate(pattern),
-	}, opts...)
-	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// UpdateUser UpdateUser patches a user account.
-func (c *UserServiceHTTPClientImpl) UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...http.CallOption) (*User, error) {
-	var out User
-	pattern := "/v1/users/{user.id}"
-	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("user"))
+// UpdateProfile UpdateProfile patches the caller's own profile fields. Identity fields
+// (username, email) and server-assigned fields are not patchable here.
+func (c *UserServiceHTTPClientImpl) UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...http.CallOption) (*UpdateProfileResponse, error) {
+	var out UpdateProfileResponse
+	pattern := "/v1/users/profile"
+	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
-		http.Operation(OperationUserServiceUpdateUser),
+		http.Operation(OperationUserServiceUpdateProfile),
 		http.PathTemplate(pattern),
 	}, opts...)
-	err := c.cc.Invoke(ctx, "PATCH", path, in.User, &out, opts...)
+	err := c.cc.Invoke(ctx, "PATCH", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

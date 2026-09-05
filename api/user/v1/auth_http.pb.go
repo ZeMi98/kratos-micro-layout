@@ -17,23 +17,23 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
-const OperationAuthServiceChangePassword = "/api.user.v1.AuthService/ChangePassword"
-const OperationAuthServiceLogin = "/api.user.v1.AuthService/Login"
-const OperationAuthServiceLogout = "/api.user.v1.AuthService/Logout"
-const OperationAuthServiceRefreshToken = "/api.user.v1.AuthService/RefreshToken"
-const OperationAuthServiceRegister = "/api.user.v1.AuthService/Register"
+const OperationAuthServiceChangePassword = "/user.v1.AuthService/ChangePassword"
+const OperationAuthServiceLogin = "/user.v1.AuthService/Login"
+const OperationAuthServiceLogout = "/user.v1.AuthService/Logout"
+const OperationAuthServiceRefreshToken = "/user.v1.AuthService/RefreshToken"
+const OperationAuthServiceRegister = "/user.v1.AuthService/Register"
 
 type AuthServiceHTTPServer interface {
 	// ChangePassword ChangePassword updates the authenticated user's password.
-	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordReply, error)
+	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
 	// Login Login authenticates a user and returns tokens.
-	Login(context.Context, *LoginRequest) (*LoginReply, error)
+	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	// Logout Logout invalidates the current session.
-	Logout(context.Context, *LogoutRequest) (*LogoutReply, error)
+	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	// RefreshToken RefreshToken exchanges a valid refresh token for a new token pair.
-	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenReply, error)
+	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	// Register Register creates a new user account with credentials.
-	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
+	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 }
 
 func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
@@ -59,7 +59,7 @@ func _AuthService_Register0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx htt
 		if err != nil {
 			return err
 		}
-		reply := out.(*RegisterReply)
+		reply := out.(*RegisterResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -78,7 +78,7 @@ func _AuthService_Login0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.C
 		if err != nil {
 			return err
 		}
-		reply := out.(*LoginReply)
+		reply := out.(*LoginResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -97,7 +97,7 @@ func _AuthService_Logout0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.
 		if err != nil {
 			return err
 		}
-		reply := out.(*LogoutReply)
+		reply := out.(*LogoutResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -116,7 +116,7 @@ func _AuthService_RefreshToken0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx
 		if err != nil {
 			return err
 		}
-		reply := out.(*RefreshTokenReply)
+		reply := out.(*RefreshTokenResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -135,22 +135,22 @@ func _AuthService_ChangePassword0_HTTP_Handler(srv AuthServiceHTTPServer) func(c
 		if err != nil {
 			return err
 		}
-		reply := out.(*ChangePasswordReply)
+		reply := out.(*ChangePasswordResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 type AuthServiceHTTPClient interface {
 	// ChangePassword ChangePassword updates the authenticated user's password.
-	ChangePassword(ctx context.Context, req *ChangePasswordRequest, opts ...http.CallOption) (rsp *ChangePasswordReply, err error)
+	ChangePassword(ctx context.Context, req *ChangePasswordRequest, opts ...http.CallOption) (rsp *ChangePasswordResponse, err error)
 	// Login Login authenticates a user and returns tokens.
-	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginReply, err error)
+	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
 	// Logout Logout invalidates the current session.
-	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutReply, err error)
+	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
 	// RefreshToken RefreshToken exchanges a valid refresh token for a new token pair.
-	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenReply, err error)
+	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenResponse, err error)
 	// Register Register creates a new user account with credentials.
-	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterReply, err error)
+	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterResponse, err error)
 }
 
 type AuthServiceHTTPClientImpl struct {
@@ -162,8 +162,8 @@ func NewAuthServiceHTTPClient(client *http.Client) AuthServiceHTTPClient {
 }
 
 // ChangePassword ChangePassword updates the authenticated user's password.
-func (c *AuthServiceHTTPClientImpl) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...http.CallOption) (*ChangePasswordReply, error) {
-	var out ChangePasswordReply
+func (c *AuthServiceHTTPClientImpl) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...http.CallOption) (*ChangePasswordResponse, error) {
+	var out ChangePasswordResponse
 	pattern := "/v1/auth/change-password"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -180,8 +180,8 @@ func (c *AuthServiceHTTPClientImpl) ChangePassword(ctx context.Context, in *Chan
 }
 
 // Login Login authenticates a user and returns tokens.
-func (c *AuthServiceHTTPClientImpl) Login(ctx context.Context, in *LoginRequest, opts ...http.CallOption) (*LoginReply, error) {
-	var out LoginReply
+func (c *AuthServiceHTTPClientImpl) Login(ctx context.Context, in *LoginRequest, opts ...http.CallOption) (*LoginResponse, error) {
+	var out LoginResponse
 	pattern := "/v1/auth/login"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -198,8 +198,8 @@ func (c *AuthServiceHTTPClientImpl) Login(ctx context.Context, in *LoginRequest,
 }
 
 // Logout Logout invalidates the current session.
-func (c *AuthServiceHTTPClientImpl) Logout(ctx context.Context, in *LogoutRequest, opts ...http.CallOption) (*LogoutReply, error) {
-	var out LogoutReply
+func (c *AuthServiceHTTPClientImpl) Logout(ctx context.Context, in *LogoutRequest, opts ...http.CallOption) (*LogoutResponse, error) {
+	var out LogoutResponse
 	pattern := "/v1/auth/logout"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -216,8 +216,8 @@ func (c *AuthServiceHTTPClientImpl) Logout(ctx context.Context, in *LogoutReques
 }
 
 // RefreshToken RefreshToken exchanges a valid refresh token for a new token pair.
-func (c *AuthServiceHTTPClientImpl) RefreshToken(ctx context.Context, in *RefreshTokenRequest, opts ...http.CallOption) (*RefreshTokenReply, error) {
-	var out RefreshTokenReply
+func (c *AuthServiceHTTPClientImpl) RefreshToken(ctx context.Context, in *RefreshTokenRequest, opts ...http.CallOption) (*RefreshTokenResponse, error) {
+	var out RefreshTokenResponse
 	pattern := "/v1/auth/refresh"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -234,8 +234,8 @@ func (c *AuthServiceHTTPClientImpl) RefreshToken(ctx context.Context, in *Refres
 }
 
 // Register Register creates a new user account with credentials.
-func (c *AuthServiceHTTPClientImpl) Register(ctx context.Context, in *RegisterRequest, opts ...http.CallOption) (*RegisterReply, error) {
-	var out RegisterReply
+func (c *AuthServiceHTTPClientImpl) Register(ctx context.Context, in *RegisterRequest, opts ...http.CallOption) (*RegisterResponse, error) {
+	var out RegisterResponse
 	pattern := "/v1/auth/register"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{

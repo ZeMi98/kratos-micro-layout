@@ -19,7 +19,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.ChangePasswordRequest'
+                            $ref: '#/components/schemas/user.v1.ChangePasswordRequest'
                 required: true
             responses:
                 "200":
@@ -27,7 +27,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.ChangePasswordReply'
+                                $ref: '#/components/schemas/user.v1.ChangePasswordResponse'
     /v1/auth/login:
         post:
             tags:
@@ -38,7 +38,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.LoginRequest'
+                            $ref: '#/components/schemas/user.v1.LoginRequest'
                 required: true
             responses:
                 "200":
@@ -46,7 +46,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.LoginReply'
+                                $ref: '#/components/schemas/user.v1.LoginResponse'
     /v1/auth/logout:
         post:
             tags:
@@ -57,7 +57,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.LogoutRequest'
+                            $ref: '#/components/schemas/user.v1.LogoutRequest'
                 required: true
             responses:
                 "200":
@@ -65,7 +65,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.LogoutReply'
+                                $ref: '#/components/schemas/user.v1.LogoutResponse'
     /v1/auth/refresh:
         post:
             tags:
@@ -76,7 +76,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.RefreshTokenRequest'
+                            $ref: '#/components/schemas/user.v1.RefreshTokenRequest'
                 required: true
             responses:
                 "200":
@@ -84,7 +84,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.RefreshTokenReply'
+                                $ref: '#/components/schemas/user.v1.RefreshTokenResponse'
     /v1/auth/register:
         post:
             tags:
@@ -95,7 +95,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.RegisterRequest'
+                            $ref: '#/components/schemas/user.v1.RegisterRequest'
                 required: true
             responses:
                 "200":
@@ -103,130 +103,32 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.RegisterReply'
-    /v1/users:
+                                $ref: '#/components/schemas/user.v1.RegisterResponse'
+    /v1/users/profile:
         get:
             tags:
                 - UserService
-            description: ListUsers lists user accounts with filtering, ordering, and pagination.
-            operationId: UserService_ListUsers
-            parameters:
-                - name: page_size
-                  in: query
-                  description: Maximum number of users to return. Default 20, max 100.
-                  schema:
-                    type: integer
-                    format: int32
-                - name: page_token
-                  in: query
-                  description: Opaque pagination cursor returned by a previous call.
-                  schema:
-                    type: string
-                - name: filter
-                  in: query
-                  description: AIP-160 filter expression, e.g. `username = "alice"`.
-                  schema:
-                    type: string
-                - name: order_by
-                  in: query
-                  description: AIP-132 order_by expression, e.g. `created_at desc`.
-                  schema:
-                    type: string
+            description: GetProfile returns the caller's own account.
+            operationId: UserService_GetProfile
             responses:
                 "200":
                     description: OK
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.ListUsersReply'
-        post:
-            tags:
-                - UserService
-            description: CreateUser creates a new user account.
-            operationId: UserService_CreateUser
-            parameters:
-                - name: password
-                  in: query
-                  description: |-
-                    Plain-text password for the new account. Write-only; never returned on
-                     the User resource. Must be 8-72 characters (bcrypt caps input at 72 bytes).
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/api.user.v1.User'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/api.user.v1.User'
-    /v1/users/{id}:
-        get:
-            tags:
-                - UserService
-            description: GetUser returns a user by ID.
-            operationId: UserService_GetUser
-            parameters:
-                - name: id
-                  in: path
-                  description: User ID (snowflake int64).
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/api.user.v1.User'
-        delete:
-            tags:
-                - UserService
-            description: DeleteUser soft-deletes a user account.
-            operationId: UserService_DeleteUser
-            parameters:
-                - name: id
-                  in: path
-                  description: User ID (snowflake int64).
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/api.user.v1.DeleteUserReply'
-    /v1/users/{user.id}:
+                                $ref: '#/components/schemas/user.v1.GetProfileResponse'
         patch:
             tags:
                 - UserService
-            description: UpdateUser patches a user account.
-            operationId: UserService_UpdateUser
-            parameters:
-                - name: user.id
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-                - name: update_mask
-                  in: query
-                  description: Field mask specifying which fields to update.
-                  schema:
-                    type: string
-                    format: field-mask
+            description: |-
+                UpdateProfile patches the caller's own profile fields. Identity fields
+                 (username, email) and server-assigned fields are not patchable here.
+            operationId: UserService_UpdateProfile
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/api.user.v1.User'
+                            $ref: '#/components/schemas/user.v1.UpdateProfileRequest'
                 required: true
             responses:
                 "200":
@@ -234,14 +136,10 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/api.user.v1.User'
+                                $ref: '#/components/schemas/user.v1.UpdateProfileResponse'
 components:
     schemas:
-        api.user.v1.ChangePasswordReply:
-            type: object
-            properties: {}
-            description: ChangePasswordReply is the response for ChangePassword.
-        api.user.v1.ChangePasswordRequest:
+        user.v1.ChangePasswordRequest:
             required:
                 - old_password
                 - new_password
@@ -254,37 +152,19 @@ components:
                     type: string
                     description: New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
             description: ChangePasswordRequest is the request for ChangePassword.
-        api.user.v1.DeleteUserReply:
+        user.v1.ChangePasswordResponse:
             type: object
             properties: {}
-            description: DeleteUserReply is the response message for DeleteUser.
-        api.user.v1.ListUsersReply:
+            description: ChangePasswordResponse is the response for ChangePassword.
+        user.v1.GetProfileResponse:
             type: object
             properties:
-                users:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.user.v1.User'
-                next_page_token:
-                    type: string
-                    description: Token to retrieve the next page. Empty when there are no more results.
-                total_count:
-                    type: string
-                    description: Total count of matching users (for display only, not for pagination).
-            description: ListUsersReply is the response message for ListUsers.
-        api.user.v1.LoginReply:
-            type: object
-            properties:
-                tokens:
-                    $ref: '#/components/schemas/api.user.v1.TokenPair'
-                user_id:
-                    type: string
-                    description: User ID (snowflake int64; JSON string via protojson).
-                username:
-                    type: string
-                    description: Login username.
-            description: LoginReply is the response for Login.
-        api.user.v1.LoginRequest:
+                user:
+                    allOf:
+                        - $ref: '#/components/schemas/user.v1.User'
+                    description: The caller's own account.
+            description: GetProfileResponse is the response message for GetProfile.
+        user.v1.LoginRequest:
             required:
                 - username
                 - password
@@ -297,11 +177,19 @@ components:
                     type: string
                     description: Plain-text password.
             description: LoginRequest is the request for Login.
-        api.user.v1.LogoutReply:
+        user.v1.LoginResponse:
             type: object
-            properties: {}
-            description: LogoutReply is the response for Logout.
-        api.user.v1.LogoutRequest:
+            properties:
+                tokens:
+                    $ref: '#/components/schemas/user.v1.TokenPair'
+                user_id:
+                    type: string
+                    description: User ID (snowflake int64; JSON string via protojson).
+                username:
+                    type: string
+                    description: Login username.
+            description: LoginResponse is the response for Login.
+        user.v1.LogoutRequest:
             type: object
             properties:
                 access_token:
@@ -310,13 +198,11 @@ components:
                         The access token to invalidate. Optional: when omitted, the token is taken
                          from the Authorization header, which the auth middleware already validates.
             description: LogoutRequest is the request for Logout.
-        api.user.v1.RefreshTokenReply:
+        user.v1.LogoutResponse:
             type: object
-            properties:
-                tokens:
-                    $ref: '#/components/schemas/api.user.v1.TokenPair'
-            description: RefreshTokenReply is the response for RefreshToken.
-        api.user.v1.RefreshTokenRequest:
+            properties: {}
+            description: LogoutResponse is the response for Logout.
+        user.v1.RefreshTokenRequest:
             required:
                 - refresh_token
             type: object
@@ -325,20 +211,13 @@ components:
                     type: string
                     description: A valid refresh token.
             description: RefreshTokenRequest is the request for RefreshToken.
-        api.user.v1.RegisterReply:
+        user.v1.RefreshTokenResponse:
             type: object
             properties:
-                user_id:
-                    type: string
-                    description: ID of the newly created user (snowflake int64; JSON string via protojson).
-                username:
-                    type: string
-                    description: Login username.
-                email:
-                    type: string
-                    description: Email address.
-            description: RegisterReply is the response for Register.
-        api.user.v1.RegisterRequest:
+                tokens:
+                    $ref: '#/components/schemas/user.v1.TokenPair'
+            description: RefreshTokenResponse is the response for RefreshToken.
+        user.v1.RegisterRequest:
             required:
                 - username
                 - email
@@ -360,8 +239,28 @@ components:
                 phone:
                     type: string
                     description: Phone number (optional).
-            description: RegisterRequest is the request for Register.
-        api.user.v1.TokenPair:
+            description: |-
+                RegisterRequest is the request for Register.
+
+                 Field constraints are written as CEL rules with explicit `message` texts so
+                 a rejected request tells the client exactly what to fix (the protovalidate
+                 middleware surfaces them verbatim in a 400). Length rules double as presence
+                 checks: a rule that fails on "" makes a separate `required` violation
+                 redundant.
+        user.v1.RegisterResponse:
+            type: object
+            properties:
+                user_id:
+                    type: string
+                    description: ID of the newly created user (snowflake int64; JSON string via protojson).
+                username:
+                    type: string
+                    description: Login username.
+                email:
+                    type: string
+                    description: Email address.
+            description: RegisterResponse is the response for Register.
+        user.v1.TokenPair:
             type: object
             properties:
                 access_token:
@@ -377,28 +276,60 @@ components:
                     type: string
                     description: Token type. Always "Bearer".
             description: TokenPair is a pair of access and refresh tokens.
-        api.user.v1.User:
+        user.v1.UpdateProfileRequest:
+            type: object
+            properties:
+                phone:
+                    type: string
+                    description: Phone number (optional).
+                nickname:
+                    type: string
+                    description: Display name.
+                avatar:
+                    type: string
+                    description: Avatar URL.
+                update_mask:
+                    type: string
+                    description: |-
+                        Field mask over the patchable profile fields: phone, nickname, avatar.
+                         Selecting a field writes it (an empty value clears it); unselected fields
+                         are left alone.
+                    format: field-mask
+            description: |-
+                UpdateProfileRequest is the request message for UpdateProfile. Only the
+                 profile fields are patchable; update_mask selects which of them to apply. A
+                 selected field is written with whatever value the request carries — leaving it
+                 empty clears it — while an unselected field keeps its stored value.
+                 Constraints are CEL rules with explicit `message` texts so a rejected request
+                 tells the client exactly what to fix (the protovalidate middleware surfaces
+                 them in a 400); IGNORE_IF_ZERO_VALUE keeps an unselected field's zero value
+                 from tripping them.
+        user.v1.UpdateProfileResponse:
+            type: object
+            properties:
+                user:
+                    allOf:
+                        - $ref: '#/components/schemas/user.v1.User'
+                    description: The updated account.
+            description: UpdateProfileResponse is the response message for UpdateProfile.
+        user.v1.User:
             required:
                 - username
                 - email
             type: object
             properties:
                 id:
+                    readOnly: true
                     type: string
                     description: |-
                         Unique identifier (snowflake int64). Serialised as a JSON string by
                          protojson so the 64-bit value stays precise in JavaScript clients.
                 username:
                     type: string
-                    description: |-
-                        Login username. Unique across the system.
-                         The shared resource is reused by UpdateUser (PATCH), so rules ignore the
-                         zero value: a patch that omits username skips these checks, while a create
-                         (which always carries a username) enforces them. Presence on create is
-                         guaranteed by the biz layer.
+                    description: Login username. Unique across the system; assigned at registration.
                 email:
                     type: string
-                    description: Email address. Unique across the system.
+                    description: Email address. Unique across the system; assigned at registration.
                 phone:
                     type: string
                     description: Phone number (optional).
@@ -409,6 +340,7 @@ components:
                     type: string
                     description: Avatar URL.
                 status:
+                    readOnly: true
                     enum:
                         - USER_STATUS_UNSPECIFIED
                         - USER_STATUS_ACTIVE
@@ -418,16 +350,25 @@ components:
                     description: Lifecycle status. Server-assigned; reads filter out deleted accounts.
                     format: enum
                 created_at:
+                    readOnly: true
                     type: string
                     description: Server-assigned creation timestamp.
                     format: date-time
                 updated_at:
+                    readOnly: true
                     type: string
                     description: Server-assigned last-update timestamp.
                     format: date-time
-            description: User is the user account resource.
+            description: |-
+                User is the user account resource. It is read-only on the wire: writes go
+                 through UpdateProfile (profile fields) and AuthService (credentials), so the
+                 resource carries no validation rules of its own.
 tags:
     - name: AuthService
       description: AuthService handles registration, login, and token management.
     - name: UserService
-      description: UserService manages user accounts.
+      description: |-
+        UserService serves the authenticated caller's own account. This template has
+         no RBAC and no admin surface: accounts are created through
+         AuthService.Register, so every RPC here is self-scoped — the caller identity
+         comes from the verified bearer token, never from the request.

@@ -7,19 +7,58 @@
 #
 #   buf   api/**.proto             -> *.pb.go / *_grpc.pb.go / *_http.pb.go
 #                                     + pkg/docs/specs/<domain>/openapi.yaml (one per domain)
-#   buf   app/*/internal/conf      -> config *.pb.go
+#   buf   app/*/internal/conf/v1 -> config *.pb.go
 #   ent   internal/data/ent/schema -> the ORM (client, queries, migrations)
 #   wire  cmd/user_center          -> wire_gen.go (dependency injection)
 #
 # Never hand-edit a generated file; edit its source and re-run the target.
 # Generated files are committed, so a source change and its regeneration
 # belong in the same commit.
+#
+# Cross-platform: every recipe is a single portable command (buf/go/git/docker)
+# or uses the $(MKDIR)/$(MOVE)/$(RM_RF) helpers below, so the same Makefile
+# runs under a POSIX sh (macOS/Linux) and under cmd.exe (Windows). On Windows
+# use a native GNU make (scoop/choco `make` or `mingw32-make`); recipes then
+# run through cmd.exe, which this file forces explicitly so behaviour does not
+# depend on which make distribution is installed. WSL behaves like Linux.
+# No recipe relies on find/grep/sed/xargs/trap or shell loops — iteration is
+# done by make itself ($(wildcard) + per-item sub-targets).
 
-VERSION := $(shell git describe --tags --always 2>/dev/null || echo dev)
+VERSION := $(shell git describe --tags --always)
+ifeq ($(VERSION),)
+VERSION := dev
+endif
 
-.PHONY: init api config ent wire generate all build \
+ifeq ($(OS),Windows_NT)
+SHELL := cmd.exe
+MKDIR = if not exist "$(1)" mkdir "$(1)"
+MOVE = move /y
+RM_RF = if exist "$(1)" rmdir /s /q "$(1)"
+HELP_CMD = findstr /c:": \#\# " $(MAKEFILE_LIST)
+else
+MKDIR = mkdir -p "$(1)"
+MOVE = mv -f
+RM_RF = rm -rf "$(1)"
+HELP_CMD = awk 'BEGIN { FS = ":.*?\#\# " } /^[a-zA-Z_-]+:.*?\#\# / { printf "\033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+endif
+
+# The codegen targets stage files through shared paths (.oapi, *.bak), so they
+# must not interleave: never run make with -j, and never combine `tidy` with
+# another target on one command line (its target-scoped GOWORK=off would leak
+# into the others).
+.NOTPARALLEL:
+.DELETE_ON_ERROR:
+
+# Domains and services are discovered by make at parse time, so an incubated
+# service or a new api/<domain> needs no registration here. (notdir runs last:
+# on a trailing-slash path it yields "" — order matters.)
+API_DOMAINS := $(notdir $(patsubst %/,%,$(wildcard api/*/)))
+CONFIG_SERVICES := $(patsubst app/%/internal/conf,%,$(wildcard app/*/internal/conf))
+
+.PHONY: init api api-domain api-clean config ent wire generate all build \
 	test run-user-center run-gateway middleware-up middleware-down middleware-search-up \
-	tidy help
+	tidy help \
+	$(API_DOMAINS:%=api-%) $(CONFIG_SERVICES:%=config-%)
 
 # app/user_center is the example service and a git submodule (the standalone
 # service-template repo kratos-micro-sub-service-layout). Neither `git clone` nor
@@ -31,24 +70,31 @@ init: ## install the codegen CLIs (buf, wire)
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/bufbuild/buf/cmd/buf@latest
 
-api: ## regenerate the public API: protos -> Go/gRPC/HTTP stubs + one OpenAPI spec per api/<domain>
-	buf generate --template buf.gen.yaml
-	@set -e; \
-	rm -rf .oapi; \
-	for p in $$(find api -mindepth 1 -maxdepth 1 -type d | sort); do \
-		name=$$(basename $$p); \
-		echo "  openapi -> pkg/docs/specs/$$name/openapi.yaml"; \
-		buf generate --template buf.gen.openapi.yaml --path api/$$name; \
-		mkdir -p pkg/docs/specs/$$name; \
-		mv .oapi/openapi.yaml pkg/docs/specs/$$name/openapi.yaml; \
-	done; \
-	rm -rf .oapi
+api: $(API_DOMAINS:%=api-%) api-clean ## regenerate the public API per domain: protos -> Go/gRPC/HTTP stubs + that domain's OpenAPI spec
 
-# The gateway's config proto sits in its own package (kratos.gateway), so it is
-# generated through a second template instead of the shared one.
-config: ## regenerate service config types: app/*/internal/conf/*.proto -> *.pb.go
-	buf generate --template buf.gen.config.yaml
-	buf generate --template buf.gen.gw.yaml --path app/gateway/internal/conf/gateway.proto
+# One sub-make per domain keeps every recipe line a single portable command.
+# Static pattern rules (not bare `api-%:`) because GNU make 3.81 — the default
+# on macOS — does not apply pattern rules to .PHONY targets.
+$(API_DOMAINS:%=api-%): api-%:
+	@$(MAKE) --no-print-directory api-domain DOMAIN=$*
+
+api-domain:
+	@echo   api/$(DOMAIN) - stubs + pkg/docs/specs/$(DOMAIN)/openapi.yaml
+	buf generate --template buf.gen.yaml --path api/$(DOMAIN)
+	$(call MKDIR,pkg/docs/specs/$(DOMAIN))
+	$(MOVE) .oapi/openapi.yaml pkg/docs/specs/$(DOMAIN)/openapi.yaml
+
+api-clean:
+	$(call RM_RF,.oapi)
+
+# Each service's config proto lives in its own package (mirroring its
+# directory under the app/ buf module). The wildcard above discovers every
+# service, so an incubated one needs no Makefile or template registration.
+config: $(CONFIG_SERVICES:%=config-%) ## regenerate service config types: app/*/internal/conf/v1/*.proto -> *.pb.go
+
+$(CONFIG_SERVICES:%=config-%): config-%:
+	@echo   conf - app/$*/internal/conf/v1
+	buf generate --template buf.gen.conf.yaml --path app/$*/internal/conf
 
 ent: ## regenerate the ent ORM after editing internal/data/ent/schema (see docs/ent.md)
 	cd app/user_center/internal/data/ent && go run generate.go
@@ -63,7 +109,8 @@ all: api config generate ## regenerate everything: protos, configs, ORM and DI
 # The nested app/user_center module is invisible to the root module's bare ./...,
 # so build and test list it explicitly.
 build: ## compile both binaries into bin/
-	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
+	$(call MKDIR,bin)
+	go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./... ./app/user_center/...
 
 test: ## run every test in both modules
 	go test ./... ./app/user_center/...
@@ -85,25 +132,21 @@ middleware-search-up: ## also start Elasticsearch + Kibana (the `search` profile
 
 # app/user_center borrows every dependency from the root go.mod through go.work,
 # so a bare `go mod tidy` here would delete the deps only that module uses (ent,
-# pgx, mysql, aip...). This target hides go.work and the nested go.mod for the
+# pgx, mysql...). This target hides go.work and the nested go.mod for the
 # duration of the tidy — turning the tree back into a single module — then
-# restores both, even if the tidy fails.
+# restores both. A failed tidy restores them as well and still fails the target
+# (the `||` branch ends in `exit 1`, which both sh and cmd.exe honour), so a
+# broken go.mod cannot slip through as a green run.
+tidy: export GOWORK = off
 tidy: ## prune go.mod/go.sum without breaking the workspace
-	@set -e; \
-	restore() { \
-		[ -f .go.work.bak ] && mv .go.work.bak go.work; \
-		[ -f app/user_center/.go.mod.bak ] && mv app/user_center/.go.mod.bak app/user_center/go.mod; \
-	}; \
-	trap restore EXIT; \
-	mv go.work .go.work.bak; \
-	mv app/user_center/go.mod app/user_center/.go.mod.bak; \
-	go mod tidy
+	$(MOVE) go.work .go.work.bak
+	$(MOVE) app/user_center/go.mod app/user_center/.go.mod.bak
+	go mod tidy || ( $(MOVE) .go.work.bak go.work && $(MOVE) app/user_center/.go.mod.bak app/user_center/go.mod && exit 1 )
+	$(MOVE) .go.work.bak go.work
+	$(MOVE) app/user_center/.go.mod.bak app/user_center/go.mod
 
 help: ## print this target list
-	@echo ''
-	@echo 'Usage: make [target]'
-	@echo ''
-	@awk 'BEGIN { FS = ":.*?## " } \
-		/^[a-zA-Z_-]+:.*?## / { printf "\033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@echo Usage: make [target]
+	@$(HELP_CMD)
 
 .DEFAULT_GOAL := help

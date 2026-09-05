@@ -1,8 +1,9 @@
 // Package docs serves each service's generated OpenAPI document together with a
 // Swagger UI for it, so a running service documents itself.
 //
-// `make api` runs protoc-gen-openapi once per api/<domain> (see
-// buf.gen.openapi.yaml) and writes pkg/docs/specs/<domain>/openapi.yaml. This
+// `make api` runs protoc-gen-openapi once per api/<domain> (the openapi plugin
+// in buf.gen.yaml, scoped per domain with --path) and writes
+// pkg/docs/specs/<domain>/openapi.yaml. This
 // package embeds that whole specs/ tree and serves the one document a service
 // asks for, so each service's /swagger lists only the RPCs that service
 // implements — not every domain's. The specs live in pkg/ (root module) rather

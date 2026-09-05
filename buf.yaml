@@ -1,8 +1,18 @@
 version: v2
+# Module roots are chosen so every proto package mirrors its directory
+# relative to its own module root (buf lint PACKAGE_DIRECTORY_MATCH) and stays
+# unique across the workspace:
+#   api - the public contract; api/user/v1/*.proto declares package user.v1.
+#   app - one module over every service so each conf proto's package carries
+#     its service name (user_center.internal.conf.v1, gateway.internal.conf.v1).
+#     Per-service roots would collide on a shared conf.v1 package the moment a
+#     second service is incubated from the template, because every service's
+#     conf proto declares the same message names (Bootstrap, Server, ...).
+# `buf lint` runs with its default rule set and no exceptions: the protos
+# themselves are written to satisfy it (see AGENTS.md "Naming & error reasons").
 modules:
   - path: api
-  - path: app/user_center/internal
-  - path: app/gateway/internal
+  - path: app
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/bufbuild/protovalidate

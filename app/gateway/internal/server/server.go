@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kratos-micro-layout/app/gateway/internal/conf"
+	"kratos-micro-layout/app/gateway/internal/conf/v1"
 	"kratos-micro-layout/app/gateway/internal/proxy"
 	pkgmw "kratos-micro-layout/pkg/middleware"
 

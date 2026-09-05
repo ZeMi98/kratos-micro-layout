@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package api.user.v1;
+package user.v1;
 
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
@@ -11,41 +11,27 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "kratos-micro-layout/api/user/v1;v1";
 option java_multiple_files = true;
-option java_package = "api.user.v1";
+option java_package = "user.v1";
 
-// UserService manages user accounts.
+// UserService serves the authenticated caller's own account. This template has
+// no RBAC and no admin surface: accounts are created through
+// AuthService.Register, so every RPC here is self-scoped — the caller identity
+// comes from the verified bearer token, never from the request.
 service UserService {
   option (google.api.default_host) = "user.example.com";
 
-  // CreateUser creates a new user account.
-  rpc CreateUser(CreateUserRequest) returns (User) {
+  // GetProfile returns the caller's own account.
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {get: "/v1/users/profile"};
+  }
+
+  // UpdateProfile patches the caller's own profile fields. Identity fields
+  // (username, email) and server-assigned fields are not patchable here.
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
     option (google.api.http) = {
-      post: "/v1/users"
-      body: "user"
+      patch: "/v1/users/profile"
+      body: "*"
     };
-  }
-
-  // GetUser returns a user by ID.
-  rpc GetUser(GetUserRequest) returns (User) {
-    option (google.api.http) = {get: "/v1/users/{id}"};
-  }
-
-  // ListUsers lists user accounts with filtering, ordering, and pagination.
-  rpc ListUsers(ListUsersRequest) returns (ListUsersReply) {
-    option (google.api.http) = {get: "/v1/users"};
-  }
-
-  // UpdateUser patches a user account.
-  rpc UpdateUser(UpdateUserRequest) returns (User) {
-    option (google.api.http) = {
-      patch: "/v1/users/{user.id}"
-      body: "user"
-    };
-  }
-
-  // DeleteUser soft-deletes a user account.
-  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserReply) {
-    option (google.api.http) = {delete: "/v1/users/{id}"};
   }
 }
 
@@ -57,143 +43,103 @@ enum UserStatus {
   USER_STATUS_DELETED = 3;
 }
 
-// User is the user account resource.
+// User is the user account resource. It is read-only on the wire: writes go
+// through UpdateProfile (profile fields) and AuthService (credentials), so the
+// resource carries no validation rules of its own.
 message User {
   // Unique identifier (snowflake int64). Serialised as a JSON string by
   // protojson so the 64-bit value stays precise in JavaScript clients.
-  int64 id = 1 [(buf.validate.field) = {
-    ignore: IGNORE_IF_ZERO_VALUE
-    int64: {gt: 0}
-  }];
+  int64 id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Login username. Unique across the system.
-  // The shared resource is reused by UpdateUser (PATCH), so rules ignore the
-  // zero value: a patch that omits username skips these checks, while a create
-  // (which always carries a username) enforces them. Presence on create is
-  // guaranteed by the biz layer.
-  string username = 2 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      ignore: IGNORE_IF_ZERO_VALUE
-      string: {
-        min_len: 3
-        max_len: 64
-      }
-    }
-  ];
+  // Login username. Unique across the system; assigned at registration.
+  string username = 2 [(google.api.field_behavior) = REQUIRED];
 
-  // Email address. Unique across the system.
-  string email = 3 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      ignore: IGNORE_IF_ZERO_VALUE
-      string: {
-        email: true
-        max_len: 255
-      }
-    }
-  ];
+  // Email address. Unique across the system; assigned at registration.
+  string email = 3 [(google.api.field_behavior) = REQUIRED];
 
   // Phone number (optional).
-  string phone = 4 [(buf.validate.field).string = {max_len: 32}];
+  string phone = 4;
 
   // Display name.
-  string nickname = 5 [(buf.validate.field).string = {max_len: 64}];
+  string nickname = 5;
 
   // Avatar URL.
-  string avatar = 6 [(buf.validate.field).string = {max_len: 512}];
+  string avatar = 6;
 
   // Lifecycle status. Server-assigned; reads filter out deleted accounts.
-  UserStatus status = 7;
+  UserStatus status = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Server-assigned creation timestamp.
-  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp created_at = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Server-assigned last-update timestamp.
-  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp updated_at = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// CreateUserRequest is the request message for CreateUser.
-message CreateUserRequest {
-  User user = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
-  ];
+// GetProfileRequest is the request message for GetProfile. The caller identity
+// comes from the access token, so the request carries no fields.
+message GetProfileRequest {}
 
-  // Plain-text password for the new account. Write-only; never returned on
-  // the User resource. Must be 8-72 characters (bcrypt caps input at 72 bytes).
-  string password = 2 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      string: {
-        min_len: 8
-        max_len: 72
-      }
+// GetProfileResponse is the response message for GetProfile.
+message GetProfileResponse {
+  // The caller's own account.
+  User user = 1;
+}
+
+// UpdateProfileRequest is the request message for UpdateProfile. Only the
+// profile fields are patchable; update_mask selects which of them to apply. A
+// selected field is written with whatever value the request carries — leaving it
+// empty clears it — while an unselected field keeps its stored value.
+// Constraints are CEL rules with explicit `message` texts so a rejected request
+// tells the client exactly what to fix (the protovalidate middleware surfaces
+// them in a 400); IGNORE_IF_ZERO_VALUE keeps an unselected field's zero value
+// from tripping them.
+message UpdateProfileRequest {
+  // Phone number (optional).
+  string phone = 1 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    cel: {
+      id: "phone.length"
+      message: "phone must be at most 32 characters"
+      expression: "this.size() <= 32"
     }
-  ];
-}
+  }];
 
-// GetUserRequest is the request message for GetUser.
-message GetUserRequest {
-  // User ID (snowflake int64).
-  int64 id = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      int64: {gt: 0}
+  // Display name.
+  string nickname = 2 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    cel: {
+      id: "nickname.length"
+      message: "nickname must be at most 64 characters"
+      expression: "this.size() <= 64"
     }
-  ];
-}
+  }];
 
-// ListUsersRequest is the request message for ListUsers.
-message ListUsersRequest {
-  // Maximum number of users to return. Default 20, max 100.
-  int32 page_size = 1;
-
-  // Opaque pagination cursor returned by a previous call.
-  string page_token = 2;
-
-  // AIP-160 filter expression, e.g. `username = "alice"`.
-  string filter = 3;
-
-  // AIP-132 order_by expression, e.g. `created_at desc`.
-  string order_by = 4;
-}
-
-// ListUsersReply is the response message for ListUsers.
-message ListUsersReply {
-  repeated User users = 1;
-
-  // Token to retrieve the next page. Empty when there are no more results.
-  string next_page_token = 2;
-
-  // Total count of matching users (for display only, not for pagination).
-  int64 total_count = 3;
-}
-
-// UpdateUserRequest is the request message for UpdateUser.
-message UpdateUserRequest {
-  User user = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
-  ];
-
-  // Field mask specifying which fields to update.
-  google.protobuf.FieldMask update_mask = 2 [(buf.validate.field).required = true];
-}
-
-// DeleteUserRequest is the request message for DeleteUser.
-message DeleteUserRequest {
-  // User ID (snowflake int64).
-  int64 id = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      int64: {gt: 0}
+  // Avatar URL.
+  string avatar = 3 [(buf.validate.field) = {
+    ignore: IGNORE_IF_ZERO_VALUE
+    cel: {
+      id: "avatar.length"
+      message: "avatar must be at most 512 characters"
+      expression: "this.size() <= 512"
     }
-  ];
+  }];
+
+  // Field mask over the patchable profile fields: phone, nickname, avatar.
+  // Selecting a field writes it (an empty value clears it); unselected fields
+  // are left alone.
+  google.protobuf.FieldMask update_mask = 4 [(buf.validate.field) = {
+    required: true
+    cel: {
+      id: "update_mask.paths"
+      message: "update_mask must select at least one of: phone, nickname, avatar"
+      expression: "this.paths.size() > 0"
+    }
+  }];
 }
 
-// DeleteUserReply is the response message for DeleteUser.
-message DeleteUserReply {}
+// UpdateProfileResponse is the response message for UpdateProfile.
+message UpdateProfileResponse {
+  // The updated account.
+  User user = 1;
+}

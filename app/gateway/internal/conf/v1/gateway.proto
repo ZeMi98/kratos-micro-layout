@@ -1,12 +1,14 @@
 syntax = "proto3";
-// The gateway uses its own package so it can live in the same buf workspace
-// as the service templates without colliding with their "kratos.api" config
-// protos.
-package kratos.gateway;
+// The package mirrors this file's directory relative to the buf module root
+// (the monorepo's app/ dir), which keeps it unique per service — the gateway's
+// conf messages (Bootstrap, Server, ...) share names with every service
+// template's — and satisfies buf lint PACKAGE_DIRECTORY_MATCH /
+// PACKAGE_VERSION_SUFFIX.
+package gateway.internal.conf.v1;
 
 import "google/protobuf/duration.proto";
 
-option go_package = "kratos-micro-layout/app/gateway/internal/conf;conf";
+option go_package = "kratos-micro-layout/app/gateway/internal/conf/v1;conf";
 
 // Bootstrap is the top-level configuration for the gateway.
 message Bootstrap {

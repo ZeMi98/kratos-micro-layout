@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package api.user.v1;
+package user.v1;
 
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
@@ -8,12 +8,12 @@ import "google/api/field_behavior.proto";
 
 option go_package = "kratos-micro-layout/api/user/v1;v1";
 option java_multiple_files = true;
-option java_package = "api.user.v1";
+option java_package = "user.v1";
 
 // AuthService handles registration, login, and token management.
 service AuthService {
   // Register creates a new user account with credentials.
-  rpc Register(RegisterRequest) returns (RegisterReply) {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
     option (google.api.http) = {
       post: "/v1/auth/register"
       body: "*"
@@ -21,7 +21,7 @@ service AuthService {
   }
 
   // Login authenticates a user and returns tokens.
-  rpc Login(LoginRequest) returns (LoginReply) {
+  rpc Login(LoginRequest) returns (LoginResponse) {
     option (google.api.http) = {
       post: "/v1/auth/login"
       body: "*"
@@ -29,7 +29,7 @@ service AuthService {
   }
 
   // Logout invalidates the current session.
-  rpc Logout(LogoutRequest) returns (LogoutReply) {
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
     option (google.api.http) = {
       post: "/v1/auth/logout"
       body: "*"
@@ -37,7 +37,7 @@ service AuthService {
   }
 
   // RefreshToken exchanges a valid refresh token for a new token pair.
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenReply) {
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
     option (google.api.http) = {
       post: "/v1/auth/refresh"
       body: "*"
@@ -45,7 +45,7 @@ service AuthService {
   }
 
   // ChangePassword updates the authenticated user's password.
-  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordReply) {
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
     option (google.api.http) = {
       post: "/v1/auth/change-password"
       body: "*"
@@ -54,16 +54,20 @@ service AuthService {
 }
 
 // RegisterRequest is the request for Register.
+//
+// Field constraints are written as CEL rules with explicit `message` texts so
+// a rejected request tells the client exactly what to fix (the protovalidate
+// middleware surfaces them verbatim in a 400). Length rules double as presence
+// checks: a rule that fails on "" makes a separate `required` violation
+// redundant.
 message RegisterRequest {
   // Login username. Must be unique.
   string username = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      string: {
-        min_len: 3
-        max_len: 64
-      }
+    (buf.validate.field).cel = {
+      id: "username.length"
+      message: "username is required and must be between 3 and 64 characters"
+      expression: "this.size() >= 3 && this.size() <= 64"
     }
   ];
 
@@ -71,10 +75,15 @@ message RegisterRequest {
   string email = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field) = {
-      required: true
-      string: {
-        email: true
-        max_len: 255
+      cel: {
+        id: "email.format"
+        message: "email is required and must be a valid address, e.g. alice@example.com"
+        expression: "this.matches('^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$')"
+      }
+      cel: {
+        id: "email.length"
+        message: "email must be at most 255 characters"
+        expression: "this.size() <= 255"
       }
     }
   ];
@@ -82,24 +91,30 @@ message RegisterRequest {
   // Plain-text password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
   string password = 3 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      string: {
-        min_len: 8
-        max_len: 72
-      }
+    (buf.validate.field).cel = {
+      id: "password.length"
+      message: "password is required and must be between 8 and 72 characters"
+      expression: "this.size() >= 8 && this.size() <= 72"
     }
   ];
 
   // Display name (optional).
-  string nickname = 4 [(buf.validate.field).string = {max_len: 64}];
+  string nickname = 4 [(buf.validate.field).cel = {
+    id: "nickname.length"
+    message: "nickname must be at most 64 characters"
+    expression: "this.size() <= 64"
+  }];
 
   // Phone number (optional).
-  string phone = 5 [(buf.validate.field).string = {max_len: 32}];
+  string phone = 5 [(buf.validate.field).cel = {
+    id: "phone.length"
+    message: "phone must be at most 32 characters"
+    expression: "this.size() <= 32"
+  }];
 }
 
-// RegisterReply is the response for Register.
-message RegisterReply {
+// RegisterResponse is the response for Register.
+message RegisterResponse {
   // ID of the newly created user (snowflake int64; JSON string via protojson).
   int64 user_id = 1;
 
@@ -115,13 +130,21 @@ message LoginRequest {
   // Login username.
   string username = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
+    (buf.validate.field).cel = {
+      id: "login.username.required"
+      message: "username is required"
+      expression: "this != ''"
+    }
   ];
 
   // Plain-text password.
   string password = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
+    (buf.validate.field).cel = {
+      id: "login.password.required"
+      message: "password is required"
+      expression: "this != ''"
+    }
   ];
 }
 
@@ -140,8 +163,8 @@ message TokenPair {
   string token_type = 4;
 }
 
-// LoginReply is the response for Login.
-message LoginReply {
+// LoginResponse is the response for Login.
+message LoginResponse {
   TokenPair tokens = 1;
 
   // User ID (snowflake int64; JSON string via protojson).
@@ -158,20 +181,24 @@ message LogoutRequest {
   string access_token = 1;
 }
 
-// LogoutReply is the response for Logout.
-message LogoutReply {}
+// LogoutResponse is the response for Logout.
+message LogoutResponse {}
 
 // RefreshTokenRequest is the request for RefreshToken.
 message RefreshTokenRequest {
   // A valid refresh token.
   string refresh_token = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
+    (buf.validate.field).cel = {
+      id: "refresh_token.required"
+      message: "refresh_token is required"
+      expression: "this != ''"
+    }
   ];
 }
 
-// RefreshTokenReply is the response for RefreshToken.
-message RefreshTokenReply {
+// RefreshTokenResponse is the response for RefreshToken.
+message RefreshTokenResponse {
   TokenPair tokens = 1;
 }
 
@@ -180,21 +207,23 @@ message ChangePasswordRequest {
   // Current password for verification.
   string old_password = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
+    (buf.validate.field).cel = {
+      id: "old_password.required"
+      message: "old_password is required"
+      expression: "this != ''"
+    }
   ];
 
   // New password. Must be 8-72 characters (bcrypt caps input at 72 bytes).
   string new_password = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field) = {
-      required: true
-      string: {
-        min_len: 8
-        max_len: 72
-      }
+    (buf.validate.field).cel = {
+      id: "new_password.length"
+      message: "new_password is required and must be between 8 and 72 characters"
+      expression: "this.size() >= 8 && this.size() <= 72"
     }
   ];
 }
 
-// ChangePasswordReply is the response for ChangePassword.
-message ChangePasswordReply {}
+// ChangePasswordResponse is the response for ChangePassword.
+message ChangePasswordResponse {}

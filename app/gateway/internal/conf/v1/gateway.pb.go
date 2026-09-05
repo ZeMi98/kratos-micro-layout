@@ -2,11 +2,13 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        (unknown)
-// source: conf/gateway.proto
+// source: gateway/internal/conf/v1/gateway.proto
 
-// The gateway uses its own package so it can live in the same buf workspace
-// as the service templates without colliding with their "kratos.api" config
-// protos.
+// The package mirrors this file's directory relative to the buf module root
+// (the monorepo's app/ dir), which keeps it unique per service — the gateway's
+// conf messages (Bootstrap, Server, ...) share names with every service
+// template's — and satisfies buf lint PACKAGE_DIRECTORY_MATCH /
+// PACKAGE_VERSION_SUFFIX.
 
 package conf
 
@@ -40,7 +42,7 @@ type Bootstrap struct {
 
 func (x *Bootstrap) Reset() {
 	*x = Bootstrap{}
-	mi := &file_conf_gateway_proto_msgTypes[0]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -52,7 +54,7 @@ func (x *Bootstrap) String() string {
 func (*Bootstrap) ProtoMessage() {}
 
 func (x *Bootstrap) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[0]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +67,7 @@ func (x *Bootstrap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Bootstrap.ProtoReflect.Descriptor instead.
 func (*Bootstrap) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{0}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Bootstrap) GetServer() *Server {
@@ -113,7 +115,7 @@ type Server struct {
 
 func (x *Server) Reset() {
 	*x = Server{}
-	mi := &file_conf_gateway_proto_msgTypes[1]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -125,7 +127,7 @@ func (x *Server) String() string {
 func (*Server) ProtoMessage() {}
 
 func (x *Server) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[1]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -138,7 +140,7 @@ func (x *Server) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Server.ProtoReflect.Descriptor instead.
 func (*Server) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{1}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Server) GetHttp() *Server_HTTP {
@@ -161,7 +163,7 @@ type Gateway struct {
 
 func (x *Gateway) Reset() {
 	*x = Gateway{}
-	mi := &file_conf_gateway_proto_msgTypes[2]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -173,7 +175,7 @@ func (x *Gateway) String() string {
 func (*Gateway) ProtoMessage() {}
 
 func (x *Gateway) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[2]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +188,7 @@ func (x *Gateway) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Gateway.ProtoReflect.Descriptor instead.
 func (*Gateway) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{2}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Gateway) GetRoutes() []*Route {
@@ -220,7 +222,7 @@ type Route struct {
 
 func (x *Route) Reset() {
 	*x = Route{}
-	mi := &file_conf_gateway_proto_msgTypes[3]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -232,7 +234,7 @@ func (x *Route) String() string {
 func (*Route) ProtoMessage() {}
 
 func (x *Route) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[3]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -245,7 +247,7 @@ func (x *Route) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Route.ProtoReflect.Descriptor instead.
 func (*Route) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{3}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Route) GetPathPrefix() string {
@@ -288,7 +290,7 @@ type Cors struct {
 
 func (x *Cors) Reset() {
 	*x = Cors{}
-	mi := &file_conf_gateway_proto_msgTypes[4]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -300,7 +302,7 @@ func (x *Cors) String() string {
 func (*Cors) ProtoMessage() {}
 
 func (x *Cors) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[4]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -313,7 +315,7 @@ func (x *Cors) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cors.ProtoReflect.Descriptor instead.
 func (*Cors) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{4}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Cors) GetAllowOrigins() []string {
@@ -368,7 +370,7 @@ type Log struct {
 
 func (x *Log) Reset() {
 	*x = Log{}
-	mi := &file_conf_gateway_proto_msgTypes[5]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -380,7 +382,7 @@ func (x *Log) String() string {
 func (*Log) ProtoMessage() {}
 
 func (x *Log) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[5]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -393,7 +395,7 @@ func (x *Log) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Log.ProtoReflect.Descriptor instead.
 func (*Log) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{5}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Log) GetLevel() string {
@@ -446,7 +448,7 @@ type Registry struct {
 
 func (x *Registry) Reset() {
 	*x = Registry{}
-	mi := &file_conf_gateway_proto_msgTypes[6]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -458,7 +460,7 @@ func (x *Registry) String() string {
 func (*Registry) ProtoMessage() {}
 
 func (x *Registry) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[6]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -471,7 +473,7 @@ func (x *Registry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Registry.ProtoReflect.Descriptor instead.
 func (*Registry) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{6}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Registry) GetAddress() string {
@@ -522,7 +524,7 @@ type Middleware struct {
 
 func (x *Middleware) Reset() {
 	*x = Middleware{}
-	mi := &file_conf_gateway_proto_msgTypes[7]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +536,7 @@ func (x *Middleware) String() string {
 func (*Middleware) ProtoMessage() {}
 
 func (x *Middleware) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[7]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +549,7 @@ func (x *Middleware) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Middleware.ProtoReflect.Descriptor instead.
 func (*Middleware) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{7}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Middleware) GetRatelimit() *RateLimit {
@@ -584,7 +586,7 @@ type RateLimit struct {
 
 func (x *RateLimit) Reset() {
 	*x = RateLimit{}
-	mi := &file_conf_gateway_proto_msgTypes[8]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +598,7 @@ func (x *RateLimit) String() string {
 func (*RateLimit) ProtoMessage() {}
 
 func (x *RateLimit) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[8]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -609,7 +611,7 @@ func (x *RateLimit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RateLimit.ProtoReflect.Descriptor instead.
 func (*RateLimit) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{8}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RateLimit) GetEnabled() bool {
@@ -659,7 +661,7 @@ type CircuitBreaker struct {
 
 func (x *CircuitBreaker) Reset() {
 	*x = CircuitBreaker{}
-	mi := &file_conf_gateway_proto_msgTypes[9]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -671,7 +673,7 @@ func (x *CircuitBreaker) String() string {
 func (*CircuitBreaker) ProtoMessage() {}
 
 func (x *CircuitBreaker) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[9]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -684,7 +686,7 @@ func (x *CircuitBreaker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CircuitBreaker.ProtoReflect.Descriptor instead.
 func (*CircuitBreaker) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{9}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CircuitBreaker) GetEnabled() bool {
@@ -740,7 +742,7 @@ type Server_HTTP struct {
 
 func (x *Server_HTTP) Reset() {
 	*x = Server_HTTP{}
-	mi := &file_conf_gateway_proto_msgTypes[10]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -752,7 +754,7 @@ func (x *Server_HTTP) String() string {
 func (*Server_HTTP) ProtoMessage() {}
 
 func (x *Server_HTTP) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_gateway_proto_msgTypes[10]
+	mi := &file_gateway_internal_conf_v1_gateway_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -765,7 +767,7 @@ func (x *Server_HTTP) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Server_HTTP.ProtoReflect.Descriptor instead.
 func (*Server_HTTP) Descriptor() ([]byte, []int) {
-	return file_conf_gateway_proto_rawDescGZIP(), []int{1, 0}
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP(), []int{1, 0}
 }
 
 func (x *Server_HTTP) GetNetwork() string {
@@ -789,28 +791,28 @@ func (x *Server_HTTP) GetTimeout() *durationpb.Duration {
 	return nil
 }
 
-var File_conf_gateway_proto protoreflect.FileDescriptor
+var File_gateway_internal_conf_v1_gateway_proto protoreflect.FileDescriptor
 
-const file_conf_gateway_proto_rawDesc = "" +
+const file_gateway_internal_conf_v1_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\x12conf/gateway.proto\x12\x0ekratos.gateway\x1a\x1egoogle/protobuf/duration.proto\"\x87\x02\n" +
-	"\tBootstrap\x12.\n" +
-	"\x06server\x18\x01 \x01(\v2\x16.kratos.gateway.ServerR\x06server\x121\n" +
-	"\agateway\x18\x02 \x01(\v2\x17.kratos.gateway.GatewayR\agateway\x12%\n" +
-	"\x03log\x18\x03 \x01(\v2\x13.kratos.gateway.LogR\x03log\x124\n" +
-	"\bregistry\x18\x04 \x01(\v2\x18.kratos.gateway.RegistryR\bregistry\x12:\n" +
+	"&gateway/internal/conf/v1/gateway.proto\x12\x18gateway.internal.conf.v1\x1a\x1egoogle/protobuf/duration.proto\"\xb9\x02\n" +
+	"\tBootstrap\x128\n" +
+	"\x06server\x18\x01 \x01(\v2 .gateway.internal.conf.v1.ServerR\x06server\x12;\n" +
+	"\agateway\x18\x02 \x01(\v2!.gateway.internal.conf.v1.GatewayR\agateway\x12/\n" +
+	"\x03log\x18\x03 \x01(\v2\x1d.gateway.internal.conf.v1.LogR\x03log\x12>\n" +
+	"\bregistry\x18\x04 \x01(\v2\".gateway.internal.conf.v1.RegistryR\bregistry\x12D\n" +
 	"\n" +
-	"middleware\x18\x05 \x01(\v2\x1a.kratos.gateway.MiddlewareR\n" +
-	"middleware\"\xa4\x01\n" +
-	"\x06Server\x12/\n" +
-	"\x04http\x18\x01 \x01(\v2\x1b.kratos.gateway.Server.HTTPR\x04http\x1ai\n" +
+	"middleware\x18\x05 \x01(\v2$.gateway.internal.conf.v1.MiddlewareR\n" +
+	"middleware\"\xae\x01\n" +
+	"\x06Server\x129\n" +
+	"\x04http\x18\x01 \x01(\v2%.gateway.internal.conf.v1.Server.HTTPR\x04http\x1ai\n" +
 	"\x04HTTP\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"b\n" +
-	"\aGateway\x12-\n" +
-	"\x06routes\x18\x01 \x03(\v2\x15.kratos.gateway.RouteR\x06routes\x12(\n" +
-	"\x04cors\x18\x02 \x01(\v2\x14.kratos.gateway.CorsR\x04cors\"i\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"v\n" +
+	"\aGateway\x127\n" +
+	"\x06routes\x18\x01 \x03(\v2\x1f.gateway.internal.conf.v1.RouteR\x06routes\x122\n" +
+	"\x04cors\x18\x02 \x01(\v2\x1e.gateway.internal.conf.v1.CorsR\x04cors\"i\n" +
 	"\x05Route\x12\x1f\n" +
 	"\vpath_prefix\x18\x01 \x01(\tR\n" +
 	"pathPrefix\x12\x18\n" +
@@ -832,11 +834,11 @@ const file_conf_gateway_proto_rawDesc = "" +
 	"\fnamespace_id\x18\x02 \x01(\tR\vnamespaceId\x12\x14\n" +
 	"\x05group\x18\x03 \x01(\tR\x05group\x12\x1a\n" +
 	"\busername\x18\x04 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x05 \x01(\tR\bpassword\"\x8e\x01\n" +
+	"\bpassword\x18\x05 \x01(\tR\bpassword\"\xa2\x01\n" +
 	"\n" +
-	"Middleware\x127\n" +
-	"\tratelimit\x18\x01 \x01(\v2\x19.kratos.gateway.RateLimitR\tratelimit\x12G\n" +
-	"\x0fcircuit_breaker\x18\x02 \x01(\v2\x1e.kratos.gateway.CircuitBreakerR\x0ecircuitBreaker\"M\n" +
+	"Middleware\x12A\n" +
+	"\tratelimit\x18\x01 \x01(\v2#.gateway.internal.conf.v1.RateLimitR\tratelimit\x12Q\n" +
+	"\x0fcircuit_breaker\x18\x02 \x01(\v2(.gateway.internal.conf.v1.CircuitBreakerR\x0ecircuitBreaker\"M\n" +
 	"\tRateLimit\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x10\n" +
 	"\x03qps\x18\x02 \x01(\x03R\x03qps\x12\x14\n" +
@@ -847,50 +849,50 @@ const file_conf_gateway_proto_rawDesc = "" +
 	"\binterval\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\binterval\x123\n" +
 	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\atimeout\x12#\n" +
 	"\rfailure_ratio\x18\x05 \x01(\x01R\ffailureRatio\x12!\n" +
-	"\fmin_requests\x18\x06 \x01(\rR\vminRequestsB4Z2kratos-micro-layout/app/gateway/internal/conf;confb\x06proto3"
+	"\fmin_requests\x18\x06 \x01(\rR\vminRequestsB7Z5kratos-micro-layout/app/gateway/internal/conf/v1;confb\x06proto3"
 
 var (
-	file_conf_gateway_proto_rawDescOnce sync.Once
-	file_conf_gateway_proto_rawDescData []byte
+	file_gateway_internal_conf_v1_gateway_proto_rawDescOnce sync.Once
+	file_gateway_internal_conf_v1_gateway_proto_rawDescData []byte
 )
 
-func file_conf_gateway_proto_rawDescGZIP() []byte {
-	file_conf_gateway_proto_rawDescOnce.Do(func() {
-		file_conf_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_conf_gateway_proto_rawDesc), len(file_conf_gateway_proto_rawDesc)))
+func file_gateway_internal_conf_v1_gateway_proto_rawDescGZIP() []byte {
+	file_gateway_internal_conf_v1_gateway_proto_rawDescOnce.Do(func() {
+		file_gateway_internal_conf_v1_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gateway_internal_conf_v1_gateway_proto_rawDesc), len(file_gateway_internal_conf_v1_gateway_proto_rawDesc)))
 	})
-	return file_conf_gateway_proto_rawDescData
+	return file_gateway_internal_conf_v1_gateway_proto_rawDescData
 }
 
-var file_conf_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_conf_gateway_proto_goTypes = []any{
-	(*Bootstrap)(nil),           // 0: kratos.gateway.Bootstrap
-	(*Server)(nil),              // 1: kratos.gateway.Server
-	(*Gateway)(nil),             // 2: kratos.gateway.Gateway
-	(*Route)(nil),               // 3: kratos.gateway.Route
-	(*Cors)(nil),                // 4: kratos.gateway.Cors
-	(*Log)(nil),                 // 5: kratos.gateway.Log
-	(*Registry)(nil),            // 6: kratos.gateway.Registry
-	(*Middleware)(nil),          // 7: kratos.gateway.Middleware
-	(*RateLimit)(nil),           // 8: kratos.gateway.RateLimit
-	(*CircuitBreaker)(nil),      // 9: kratos.gateway.CircuitBreaker
-	(*Server_HTTP)(nil),         // 10: kratos.gateway.Server.HTTP
+var file_gateway_internal_conf_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_gateway_internal_conf_v1_gateway_proto_goTypes = []any{
+	(*Bootstrap)(nil),           // 0: gateway.internal.conf.v1.Bootstrap
+	(*Server)(nil),              // 1: gateway.internal.conf.v1.Server
+	(*Gateway)(nil),             // 2: gateway.internal.conf.v1.Gateway
+	(*Route)(nil),               // 3: gateway.internal.conf.v1.Route
+	(*Cors)(nil),                // 4: gateway.internal.conf.v1.Cors
+	(*Log)(nil),                 // 5: gateway.internal.conf.v1.Log
+	(*Registry)(nil),            // 6: gateway.internal.conf.v1.Registry
+	(*Middleware)(nil),          // 7: gateway.internal.conf.v1.Middleware
+	(*RateLimit)(nil),           // 8: gateway.internal.conf.v1.RateLimit
+	(*CircuitBreaker)(nil),      // 9: gateway.internal.conf.v1.CircuitBreaker
+	(*Server_HTTP)(nil),         // 10: gateway.internal.conf.v1.Server.HTTP
 	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
 }
-var file_conf_gateway_proto_depIdxs = []int32{
-	1,  // 0: kratos.gateway.Bootstrap.server:type_name -> kratos.gateway.Server
-	2,  // 1: kratos.gateway.Bootstrap.gateway:type_name -> kratos.gateway.Gateway
-	5,  // 2: kratos.gateway.Bootstrap.log:type_name -> kratos.gateway.Log
-	6,  // 3: kratos.gateway.Bootstrap.registry:type_name -> kratos.gateway.Registry
-	7,  // 4: kratos.gateway.Bootstrap.middleware:type_name -> kratos.gateway.Middleware
-	10, // 5: kratos.gateway.Server.http:type_name -> kratos.gateway.Server.HTTP
-	3,  // 6: kratos.gateway.Gateway.routes:type_name -> kratos.gateway.Route
-	4,  // 7: kratos.gateway.Gateway.cors:type_name -> kratos.gateway.Cors
-	11, // 8: kratos.gateway.Cors.max_age:type_name -> google.protobuf.Duration
-	8,  // 9: kratos.gateway.Middleware.ratelimit:type_name -> kratos.gateway.RateLimit
-	9,  // 10: kratos.gateway.Middleware.circuit_breaker:type_name -> kratos.gateway.CircuitBreaker
-	11, // 11: kratos.gateway.CircuitBreaker.interval:type_name -> google.protobuf.Duration
-	11, // 12: kratos.gateway.CircuitBreaker.timeout:type_name -> google.protobuf.Duration
-	11, // 13: kratos.gateway.Server.HTTP.timeout:type_name -> google.protobuf.Duration
+var file_gateway_internal_conf_v1_gateway_proto_depIdxs = []int32{
+	1,  // 0: gateway.internal.conf.v1.Bootstrap.server:type_name -> gateway.internal.conf.v1.Server
+	2,  // 1: gateway.internal.conf.v1.Bootstrap.gateway:type_name -> gateway.internal.conf.v1.Gateway
+	5,  // 2: gateway.internal.conf.v1.Bootstrap.log:type_name -> gateway.internal.conf.v1.Log
+	6,  // 3: gateway.internal.conf.v1.Bootstrap.registry:type_name -> gateway.internal.conf.v1.Registry
+	7,  // 4: gateway.internal.conf.v1.Bootstrap.middleware:type_name -> gateway.internal.conf.v1.Middleware
+	10, // 5: gateway.internal.conf.v1.Server.http:type_name -> gateway.internal.conf.v1.Server.HTTP
+	3,  // 6: gateway.internal.conf.v1.Gateway.routes:type_name -> gateway.internal.conf.v1.Route
+	4,  // 7: gateway.internal.conf.v1.Gateway.cors:type_name -> gateway.internal.conf.v1.Cors
+	11, // 8: gateway.internal.conf.v1.Cors.max_age:type_name -> google.protobuf.Duration
+	8,  // 9: gateway.internal.conf.v1.Middleware.ratelimit:type_name -> gateway.internal.conf.v1.RateLimit
+	9,  // 10: gateway.internal.conf.v1.Middleware.circuit_breaker:type_name -> gateway.internal.conf.v1.CircuitBreaker
+	11, // 11: gateway.internal.conf.v1.CircuitBreaker.interval:type_name -> google.protobuf.Duration
+	11, // 12: gateway.internal.conf.v1.CircuitBreaker.timeout:type_name -> google.protobuf.Duration
+	11, // 13: gateway.internal.conf.v1.Server.HTTP.timeout:type_name -> google.protobuf.Duration
 	14, // [14:14] is the sub-list for method output_type
 	14, // [14:14] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
@@ -898,26 +900,26 @@ var file_conf_gateway_proto_depIdxs = []int32{
 	0,  // [0:14] is the sub-list for field type_name
 }
 
-func init() { file_conf_gateway_proto_init() }
-func file_conf_gateway_proto_init() {
-	if File_conf_gateway_proto != nil {
+func init() { file_gateway_internal_conf_v1_gateway_proto_init() }
+func file_gateway_internal_conf_v1_gateway_proto_init() {
+	if File_gateway_internal_conf_v1_gateway_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conf_gateway_proto_rawDesc), len(file_conf_gateway_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_internal_conf_v1_gateway_proto_rawDesc), len(file_gateway_internal_conf_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_conf_gateway_proto_goTypes,
-		DependencyIndexes: file_conf_gateway_proto_depIdxs,
-		MessageInfos:      file_conf_gateway_proto_msgTypes,
+		GoTypes:           file_gateway_internal_conf_v1_gateway_proto_goTypes,
+		DependencyIndexes: file_gateway_internal_conf_v1_gateway_proto_depIdxs,
+		MessageInfos:      file_gateway_internal_conf_v1_gateway_proto_msgTypes,
 	}.Build()
-	File_conf_gateway_proto = out.File
-	file_conf_gateway_proto_goTypes = nil
-	file_conf_gateway_proto_depIdxs = nil
+	File_gateway_internal_conf_v1_gateway_proto = out.File
+	file_gateway_internal_conf_v1_gateway_proto_goTypes = nil
+	file_gateway_internal_conf_v1_gateway_proto_depIdxs = nil
 }
